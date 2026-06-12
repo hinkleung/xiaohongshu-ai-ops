@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - XHS_MCP_URL=http://mcp:18060
+      - FERNET_KEY=${FERNET_KEY:-}
+    depends_on:
+      - mcp
+    restart: unless-stopped
+
+  mcp:
+    image: xpzouying/xiaohongshu-mcp:latest
+    ports:
+      - "18060:18060"
+    volumes:
+      - ./mcp-data:/app/data
+      - ./data/uploads:/images
+    environment:
+      - headless=true
+    restart: unless-stopped

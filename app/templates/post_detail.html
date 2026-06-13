@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}文章详情 — 小红书 AI 运营平台{% endblock %}
+{% block content %}
+<div x-data="postEditor" x-init="init({{ post | tojson | safe }})">
+    <h2>文章详情</h2>
+    <div><span :class="'status-' + post.status" x-text="statusLabel(post.status)"></span></div>
+
+    <label>标题 <small x-text="'(' + (post.title?.length || 0) + '/20字)'"></small></label>
+    <input type="text" x-model="post.title" maxlength="20">
+
+    <label>正文</label>
+    <textarea x-model="post.content" rows="10"></textarea>
+
+    <label>标签</label>
+    <div>
+        <template x-for="(tag, i) in post.tags" :key="i">
+            <span class="tag" style="cursor:pointer;" @click="removeTag(i)" x-text="'#' + tag + ' ✕'"></span>
+        </template>
+        <input type="text" placeholder="添加标签..." @keydown.enter.prevent="addTag($event)" style="width:120px;display:inline-block;">
+    </div>
+
+    <label>图片</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <template x-for="(img, i) in post.images" :key="i">
+            <div style="position:relative;">
+                <img :src="img" style="width:120px;height:120px;object-fit:cover;border-radius:6px;">
+                <button @click="removeImage(i)" style="position:absolute;top:2px;right:2px;padding:2px 6px;font-size:0.7em;">✕</button>
+            </div>
+        </template>
+    </div>
+
+    <div style="margin-top:1rem;">
+        <small x-text="'主题: ' + (post.theme || '-')"></small>
+        <small x-show="post.ai_provider" x-text="' · AI: ' + post.ai_provider"></small>
+        <small x-text="' · 创建于 ' + new Date(post.created_at).toLocaleString('zh-CN')"></small>
+        <small x-show="post.xhs_feed_id" x-text="' · Feed: ' + post.xhs_feed_id"></small>
+    </div>
+
+    <div role="group" style="margin-top:1.5rem;">
+        <button @click="save">💾 保存</button>
+        <button @click="publish" x-show="post.status !== 'published'" class="secondary">🚀 发布</button>
+        <button @click="regenerate" class="secondary">🔄 重新生成</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('postEditor', () => ({
+        post: {},
+        init(data) { this.post = {...data}; },
+        statusLabel(s) { return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s; },
+        async save() {
+            const resp = await fetch(`/api/posts/${this.post.id}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title: this.post.title, content: this.post.content,
+                    tags: this.post.tags,
+                }),
+            });
+            if (resp.ok) alert('已保存');
+            else alert('保存失败');
+        },
+        async publish() {
+            const resp = await fetch(`/api/agent/${this.post.id}/publish`, {method: 'POST'});
+            const data = await resp.json();
+            if (data.success) { this.post.status = 'published'; alert('发布成功！'); }
+            else alert('发布失败: ' + (data.error || 'unknown'));
+        },
+        async regenerate() { window.location.href = `/generate/${this.post.id}`; },
+        addTag(e) {
+            const tag = e.target.value.trim();
+            if (tag && !this.post.tags.includes(tag)) this.post.tags.push(tag);
+            e.target.value = '';
+        },
+        removeTag(i) { this.post.tags.splice(i, 1); },
+        removeImage(i) { this.post.images.splice(i, 1); },
+    }));
+});
+</script>
+{% endblock %}

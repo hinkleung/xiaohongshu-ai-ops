@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}首页 — 小红书 AI 运营平台{% endblock %}
+{% block content %}
+<h2>生成小红书文案</h2>
+<p class="subtitle">输入活动主题，AI 自动生成去 AI 味、合规的小红书文案</p>
+
+<form x-data="generatorForm" @submit.prevent="startGenerate">
+    <label>活动主题</label>
+    <textarea x-model="theme" placeholder="例如：小鹏G9春日出行体验分享" rows="2" required></textarea>
+
+    <label>选择 AI Provider</label>
+    <select x-model="aiProvider" required>
+        <option value="">-- 选择 AI --</option>
+        {% for c in configs %}
+        <option value="{{ c.provider }}" {% if c.is_active %}selected{% endif %}>
+            {{ c.provider | upper }} ({{ c.quick_model }} / {{ c.deep_model }})
+        </option>
+        {% endfor %}
+    </select>
+    {% if not configs %}
+    <small>⚠️ 尚未配置 AI，请先前往 <a href="/settings">设置</a></small>
+    {% endif %}
+
+    <label>上传图片</label>
+    <input type="file" x-ref="images" multiple accept="image/*" @change="handleImages">
+
+    <div x-show="previews.length > 0" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;">
+        <template x-for="(url, i) in previews" :key="i">
+            <img :src="url" style="width:100px;height:100px;object-fit:cover;border-radius:6px;">
+        </template>
+    </div>
+
+    <button type="submit" :disabled="loading">
+        <span x-show="!loading">🚀 开始生成</span>
+        <span x-show="loading" aria-busy="true">生成中...</span>
+    </button>
+</form>
+
+<div x-show="progress.length > 0" class="progress-log" x-ref="log">
+    <template x-for="(p, i) in progress" :key="i">
+        <div :class="p.status">
+            <span x-text="p.status === 'done' ? '🟢' : p.status === 'running' ? '🟡' : '🔴'"></span>
+            <span x-text="p.message"></span>
+            <span x-show="p.data?.flagged_count" x-text="' (' + p.data.flagged_count + '处痕迹)'"></span>
+        </div>
+    </template>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}生成中... — 小红书 AI 运营平台{% endblock %}
+{% block content %}
+<h2>Agent 生成进度</h2>
+
+<div x-data="progressView" x-init="connect('{{ run_id }}')">
+    <div class="progress-log" x-ref="log">
+        <template x-for="(p, i) in events" :key="i">
+            <div :class="p.status">
+                <span x-text="p.status === 'done' ? '🟢' : p.status === 'running' ? '🟡' : '🔴'"></span>
+                <span x-text="p.message"></span>
+                <span x-show="p.data?.flagged_count" x-text="' (' + p.data.flagged_count + '处痕迹)'"></span>
+            </div>
+        </template>
+    </div>
+
+    <div x-show="done" style="margin-top:1.5rem;">
+        <a :href="'/posts/' + draftId" role="button">📝 前往查看草稿</a>
+    </div>
+
+    <div x-show="error" style="margin-top:1rem;color:#c62828;">
+        <p x-text="'❌ ' + errorMsg"></p>
+        <a href="/" role="button" class="secondary">返回重试</a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('progressView', () => ({
+        events: [],
+        done: false,
+        error: false,
+        errorMsg: '',
+        draftId: null,
+        async connect(runId) {
+            const resp = await fetch('/api/agent/generate', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({theme: '', images: [], ai_provider: ''}),
+            });
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            this.events.push(data);
+                            this.$nextTick(() => {
+                                const log = this.$refs.log;
+                                if (log) log.scrollTop = log.scrollHeight;
+                            });
+                            if (data.status === 'error') { this.error = true; this.errorMsg = data.message; }
+                            if (data.node === 'save_draft' && data.status === 'done') {
+                                this.done = true; this.draftId = data.data?.draft_id;
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+        },
+    }));
+});
+</script>
+{% endblock %}

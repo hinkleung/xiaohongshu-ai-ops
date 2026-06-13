@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}小红书 AI 运营平台{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script defer src="/static/app.js"></script>
+    <style>
+        :root { --pico-font-size: 95%; }
+        .container { max-width: 900px; }
+        nav { margin-bottom: 1.5rem; }
+        nav a { text-decoration: none; }
+        .nav-active { font-weight: bold; text-decoration: underline; }
+        .post-card { margin-bottom: 1rem; }
+        .tag { display: inline-block; background: var(--pico-primary-background); color: var(--pico-primary-inverse); padding: 2px 8px; border-radius: 4px; font-size: 0.85em; margin: 2px; }
+        .status-draft { color: var(--pico-muted-color); }
+        .status-published { color: var(--pico-primary); }
+        .status-failed { color: #c62828; }
+        .progress-log { background: #1a1a2e; color: #e0e0e0; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 14px; line-height: 1.8; max-height: 400px; overflow-y: auto; }
+        .progress-log .done { color: #66bb6a; }
+        .progress-log .running { color: #ffd700; }
+        .progress-log .error { color: #ef5350; }
+    </style>
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong>🍠 小红书运营</strong></li>
+        </ul>
+        <ul>
+            <li><a href="/" class="{% if request.url.path == '/' %}nav-active{% endif %}">首页</a></li>
+            <li><a href="/posts" class="{% if request.url.path.startswith('/posts') %}nav-active{% endif %}">文章管理</a></li>
+            <li><a href="/settings" class="{% if request.url.path == '/settings' %}nav-active{% endif %}">设置</a></li>
+        </ul>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

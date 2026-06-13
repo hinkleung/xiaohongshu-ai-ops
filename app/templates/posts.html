@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}文章管理 — 小红书 AI 运营平台{% endblock %}
+{% block content %}
+<h2>文章管理</h2>
+
+<div x-data="postList">
+    <div role="group">
+        <button @click="filter = ''" :class="filter === '' ? '' : 'outline'">全部</button>
+        <button @click="filter = 'draft'" :class="filter === 'draft' ? '' : 'outline'">草稿</button>
+        <button @click="filter = 'published'" :class="filter === 'published' ? '' : 'outline'">已发布</button>
+        <button @click="filter = 'failed'" :class="filter === 'failed' ? '' : 'outline'">失败</button>
+    </div>
+
+    <div style="margin-top:1rem;">
+        <template x-for="post in filteredPosts" :key="post.id">
+            <article class="post-card">
+                <header>
+                    <strong x-text="post.title || '(无标题)'"></strong>
+                    <small :class="'status-' + post.status" x-text="statusLabel(post.status)"></small>
+                </header>
+                <p x-text="(post.content || '').substring(0, 150) + '...'"></p>
+                <footer>
+                    <div>
+                        <template x-for="tag in post.tags" :key="tag">
+                            <span class="tag" x-text="'#' + tag"></span>
+                        </template>
+                    </div>
+                    <div style="margin-top:0.5rem;">
+                        <small x-text="'主题: ' + (post.theme || '-')"></small>
+                        <small x-text="' · ' + new Date(post.created_at).toLocaleDateString('zh-CN')"></small>
+                    </div>
+                    <div style="margin-top:0.5rem;">
+                        <a :href="'/posts/' + post.id" role="button" style="padding:4px 12px;font-size:0.85em;">查看/编辑</a>
+                        <button @click="deletePost(post.id)" style="padding:4px 12px;font-size:0.85em;" class="secondary">删除</button>
+                        <button x-show="post.status === 'draft'"
+                                @click="publishPost(post.id)"
+                                style="padding:4px 12px;font-size:0.85em;">发布</button>
+                    </div>
+                </footer>
+            </article>
+        </template>
+        <p x-show="filteredPosts.length === 0">暂无文章</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('postList', () => ({
+        filter: '',
+        posts: {{ posts | tojson | safe }},
+        get filteredPosts() {
+            return this.filter ? this.posts.filter(p => p.status === this.filter) : this.posts;
+        },
+        statusLabel(s) {
+            return {draft: '草稿', published: '已发布', failed: '发布失败'}[s] || s;
+        },
+        async deletePost(id) {
+            if (!confirm('确认删除？')) return;
+            await fetch(`/api/posts/${id}`, {method: 'DELETE'});
+            this.posts = this.posts.filter(p => p.id !== id);
+        },
+        async publishPost(id) {
+            const resp = await fetch(`/api/agent/${id}/publish`, {method: 'POST'});
+            const data = await resp.json();
+            if (data.success) {
+                const post = this.posts.find(p => p.id === id);
+                if (post) post.status = 'published';
+            } else {
+                alert('发布失败: ' + (data.error || 'unknown'));
+            }
+        },
+    }));
+});
+</script>
+{% endblock %}

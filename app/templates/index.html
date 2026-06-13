@@ -38,8 +38,10 @@
         </template>
     </div>
 
-    <button type="submit" :disabled="loading" x-text="loading ? '正在生成中…' : '开始生成'"
+    <button type="submit" :disabled="loading"
         style="width:100%;margin-top:12px;padding:14px 24px;font-size:1rem;font-weight:600;text-align:center;background:#ff5a1f;color:#fff;border:none;border-radius:24px;cursor:pointer;">
+        开始生成
+    </button>
 </form>
 
 <div x-show="progress.length > 0" class="log" x-ref="log" style="margin-top:24px;">

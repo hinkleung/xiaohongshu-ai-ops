@@ -67,7 +67,7 @@
 
 <!-- QR Modal — outside Alpine scope, controlled by vanilla JS -->
 <div id="qr-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
-    <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;padding:32px;max-width:380px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:380px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
         <h3 style="margin-bottom:6px;font-size:1.1rem;text-align:center;color:var(--color-text);">扫码登录小红书</h3>
         <p id="qr-loading" style="text-align:center;color:var(--color-text-secondary);padding:32px 0;font-size:.88rem;">正在获取登录二维码…</p>
         <div id="qr-content" style="display:none;">
@@ -78,7 +78,7 @@
             <p id="qr-expire" style="text-align:center;font-size:.78rem;color:var(--color-text-secondary);margin-top:12px;display:none;"></p>
         </div>
         <div style="margin-top:20px;">
-            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:180px;">完成扫码，刷新状态</button>
+            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:180px;justify-content:center;text-align:center;">完成扫码，刷新状态</button>
         </div>
     </div>
 </div>

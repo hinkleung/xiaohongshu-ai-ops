@@ -8,6 +8,7 @@
             <span :class="'badge badge-' + post.status" x-text="statusLabel(post.status)"></span>
         </div>
         <div class="flex">
+            <a href="/posts" class="btn btn-ghost btn-sm">← 返回</a>
             <button @click="save" class="btn btn-outline btn-sm">保存</button>
             <button @click="publish" x-show="post.status !== 'published'" class="btn btn-accent btn-sm">发布</button>
             <button @click="regenerate" class="btn btn-ghost btn-sm">重新生成</button>

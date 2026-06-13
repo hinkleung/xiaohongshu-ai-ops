@@ -78,7 +78,7 @@
             <p id="qr-expire" style="text-align:center;font-size:.78rem;color:var(--color-text-secondary);margin-top:12px;display:none;"></p>
         </div>
         <div style="margin-top:20px;">
-            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:180px;justify-content:center;text-align:center;">完成扫码，刷新状态</button>
+            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:180px;justify-content:center;text-align:center;">完成</button>
         </div>
     </div>
 </div>
@@ -95,6 +95,8 @@ function formatCountdown(sec) {
     return Math.floor(sec / 60) + '分' + (sec % 60) + '秒';
 }
 
+function onEsc(e) { if (e.key === 'Escape') closeQRModal(); }
+
 async function showQRModal() {
     var m = document.getElementById('qr-modal');
     var loading = document.getElementById('qr-loading');
@@ -103,6 +105,7 @@ async function showQRModal() {
     var expire = document.getElementById('qr-expire');
     if (qrTimer) clearInterval(qrTimer);
     m.style.display = 'flex';
+    document.addEventListener('keydown', onEsc);
     loading.style.display = 'block';
     content.style.display = 'none';
     expire.style.display = 'none';
@@ -136,6 +139,7 @@ async function showQRModal() {
 
 function closeQRModal() {
     if (qrTimer) clearInterval(qrTimer);
+    document.removeEventListener('keydown', onEsc);
     document.getElementById('qr-modal').style.display = 'none';
     window.dispatchEvent(new CustomEvent('xhs-refresh'));
 }

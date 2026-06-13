@@ -2,64 +2,57 @@
 {% block title %}文章详情 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
 <div x-data="postEditor" x-init="init({{ post | tojson | safe }})">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
         <div>
-            <h1 style="margin-bottom:2px;">文章详情</h1>
+            <h1 style="margin-bottom:4px;">文章详情</h1>
             <span :class="'badge badge-' + post.status" x-text="statusLabel(post.status)"></span>
         </div>
-        <div class="flex-row gap-2">
-            <button @click="save" class="btn btn-primary btn-sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                保存
-            </button>
+        <div class="flex">
+            <button @click="save" class="btn btn-outline btn-sm">保存</button>
             <button @click="publish" x-show="post.status !== 'published'" class="btn btn-accent btn-sm">发布</button>
             <button @click="regenerate" class="btn btn-ghost btn-sm">重新生成</button>
         </div>
     </div>
 
-    <div class="grid-2" style="margin-top:20px;">
-        <div class="form-group">
-            <label class="form-label">标题 <span style="color:var(--color-text-muted);font-weight:400;" x-text="'(' + (post.title?.length || 0) + '/20)'"></span></label>
-            <input type="text" x-model="post.title" class="form-input" maxlength="20">
+    <div class="row" style="margin-top:20px;">
+        <div class="field">
+            <label>标题 <span style="color:var(--text-muted);font-weight:400;" x-text="'(' + (post.title?.length || 0) + '/20)'"></span></label>
+            <input type="text" x-model="post.title" class="input" maxlength="20">
         </div>
-        <div class="form-group">
-            <label class="form-label">标签</label>
-            <div class="flex-row gap-2">
+        <div class="field">
+            <label>标签</label>
+            <div class="flex">
                 <template x-for="(tag, i) in post.tags" :key="i">
-                    <span class="tag">
-                        #<span x-text="tag"></span>
-                        <span class="tag-remove" @click="removeTag(i)">×</span>
-                    </span>
+                    <span class="tag">#<span x-text="tag"></span><span style="cursor:pointer;margin-left:3px;opacity:.5;" @click="removeTag(i)">×</span></span>
                 </template>
-                <input type="text" placeholder="+ 添加标签" @keydown.enter.prevent="addTag($event)"
-                    style="border:none;background:transparent;font-size:.82rem;width:90px;outline:none;color:var(--color-text-secondary);">
+                <input type="text" placeholder="+ 标签" @keydown.enter.prevent="addTag($event)" style="border:none;background:transparent;font-size:.82rem;width:80px;outline:none;color:var(--text-muted);">
             </div>
         </div>
     </div>
 
-    <div class="form-group">
-        <label class="form-label">正文</label>
-        <textarea x-model="post.content" class="form-textarea" rows="12"></textarea>
+    <div class="field">
+        <label>正文</label>
+        <textarea x-model="post.content" class="textarea" rows="14"></textarea>
     </div>
 
-    <div class="form-group">
-        <label class="form-label">图片</label>
-        <div class="image-preview-grid">
+    <div class="field">
+        <label>图片</label>
+        <div class="thumbs">
             <template x-for="(img, i) in post.images" :key="i">
-                <div style="position:relative;display:inline-block;">
-                    <img :src="img" class="image-preview" style="width:128px;height:128px;">
-                    <button @click="removeImage(i)" class="btn btn-danger btn-sm" style="position:absolute;top:2px;right:2px;padding:2px 6px;font-size:.65rem;">×</button>
+                <div style="position:relative;">
+                    <img :src="img" class="thumb" style="width:120px;height:120px;">
+                    <button @click="removeImage(i)" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:var(--error);color:#fff;border:none;cursor:pointer;font-size:.65rem;line-height:20px;text-align:center;">×</button>
                 </div>
             </template>
         </div>
     </div>
 
-    <div style="font-size:.82rem;color:var(--color-text-muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--color-border);">
-        <span x-show="post.theme">主题：<span x-text="post.theme" style="color:var(--color-text-secondary);"></span> · </span>
-        <span x-show="post.ai_provider">AI：<span x-text="post.ai_provider" style="color:var(--color-text-secondary);"></span> · </span>
+    <p style="font-size:.8rem;color:var(--text-muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+        <span x-show="post.theme">主题：<span x-text="post.theme" style="color:var(--text-secondary);"></span> · </span>
+        <span x-show="post.ai_provider">AI：<span x-text="post.ai_provider" style="color:var(--text-secondary);"></span> · </span>
         <span x-text="'创建于 ' + new Date(post.created_at).toLocaleString('zh-CN')"></span>
         <span x-show="post.xhs_feed_id"> · FeedID：<code x-text="post.xhs_feed_id"></code></span>
-    </div>
+    </p>
 </div>
 
 <script>
@@ -69,35 +62,23 @@ document.addEventListener('alpine:init', () => {
         init(data) { this.post = {...data}; },
         statusLabel(s) { return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s; },
         async save() {
-            const resp = await fetch(`/api/posts/${this.post.id}`, {
-                method: 'PUT', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ title: this.post.title, content: this.post.content, tags: this.post.tags }),
-            });
-            if (resp.ok) this._flash('已保存');
-            else alert('保存失败');
+            await fetch(`/api/posts/${this.post.id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:this.post.title,content:this.post.content,tags:this.post.tags})});
+            flash('已保存');
         },
         async publish() {
-            const resp = await fetch(`/api/agent/${this.post.id}/publish`, {method: 'POST'});
-            const data = await resp.json();
-            if (data.success) { this.post.status = 'published'; this._flash('发布成功'); }
-            else alert('发布失败: ' + (data.error || ''));
+            const r = await fetch(`/api/agent/${this.post.id}/publish`,{method:'POST'});const d=await r.json();
+            if(d.success){this.post.status='published';flash('发布成功');}else alert('发布失败: '+d.error);
         },
         async regenerate() { window.location.href = `/generate/${this.post.id}`; },
-        addTag(e) {
-            const tag = e.target.value.trim();
-            if (tag && !this.post.tags.includes(tag)) this.post.tags.push(tag);
-            e.target.value = '';
-        },
-        removeTag(i) { this.post.tags.splice(i, 1); },
-        removeImage(i) { this.post.images.splice(i, 1); },
-        _flash(msg) {
-            const el = document.createElement('div');
-            el.textContent = msg;
-            el.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--color-success);color:#fff;padding:8px 16px;border-radius:8px;font-size:.85rem;z-index:999;animation:fade-in-up .3s ease-out';
-            document.body.appendChild(el);
-            setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(() => el.remove(), 300); }, 2000);
-        },
+        addTag(e) { const t = e.target.value.trim(); if (t && !this.post.tags.includes(t)) this.post.tags.push(t); e.target.value = ''; },
+        removeTag(i) { this.post.tags.splice(i,1); },
+        removeImage(i) { this.post.images.splice(i,1); },
     }));
 });
+function flash(msg) {
+    var e=document.createElement('div');e.textContent=msg;
+    e.style.cssText='position:fixed;top:20px;right:20px;background:var(--success);color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out';
+    document.body.appendChild(e);setTimeout(function(){e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(function(){e.remove()},300)},2000);
+}
 </script>
 {% endblock %}

@@ -2,34 +2,30 @@
 {% block title %}生成中… — 小红书 AI 运营平台{% endblock %}
 {% block content %}
 <h1>Agent 生成进度</h1>
-<p class="subtitle">AI Agent 正在协作生成文案，实时展示各节点进度</p>
+<p class="sub">AI Agent 正在协作生成文案</p>
 
 <div x-data="progressView" x-init="connect('{{ run_id }}')">
-    <div class="progress-log" x-ref="log">
+    <div class="log" x-ref="log">
         <template x-for="(p, i) in events" :key="i">
-            <div class="progress-item animate-in">
-                <div :class="'progress-dot ' + p.status"></div>
+            <div class="log-line in">
+                <div :class="'log-dot ' + (p.status==='done'?'ok':p.status==='running'?'busy':'bad')"></div>
                 <div>
-                    <span x-text="p.message"
-                        :style="p.status === 'done' ? 'color:var(--color-success)' : p.status === 'error' ? 'color:var(--color-error)' : ''">
-                    </span>
-                    <span x-show="p.data?.flagged_count" style="color:var(--color-warning);font-size:.82rem;"
-                        x-text="'（检测到 ' + p.data.flagged_count + ' 处 AI 痕迹）'"></span>
-                    <span x-show="p.data?.warnings?.length" style="color:var(--color-warning);font-size:.82rem;"
-                        x-text="'（规则提醒: ' + p.data.warnings.join(', ') + '）'"></span>
+                    <span x-text="p.message" :style="p.status==='done'?'color:var(--success)':p.status==='error'?'color:var(--error)':''"></span>
+                    <span x-show="p.data?.flagged_count" style="color:var(--warn);font-size:.8rem;" x-text="'（' + p.data.flagged_count + '处 AI 痕迹）'"></span>
+                    <span x-show="p.data?.warnings?.length" style="color:var(--warn);font-size:.8rem;" x-text="'（规则: ' + p.data.warnings.join(', ') + '）'"></span>
                 </div>
             </div>
         </template>
     </div>
 
     <div x-show="done" class="card" style="text-align:center;margin-top:24px;">
-        <p style="font-size:1.1rem;font-weight:600;margin-bottom:12px;">✅ 文案生成完成</p>
-        <a :href="'/posts/' + draftId" class="btn btn-accent btn-lg">前往查看草稿</a>
+        <p style="font-size:1.1rem;font-weight:600;margin-bottom:12px;">文案生成完成 ✨</p>
+        <a :href="'/posts/' + draftId" class="btn btn-accent">前往查看草稿</a>
     </div>
 
-    <div x-show="error" class="card" style="text-align:center;margin-top:24px;border-color:var(--color-error);">
-        <p style="color:var(--color-error);font-weight:600;margin-bottom:12px;" x-text="'生成失败: ' + errorMsg"></p>
-        <a href="/" class="btn btn-secondary">返回重试</a>
+    <div x-show="error" class="card" style="text-align:center;margin-top:24px;border-color:var(--error);">
+        <p style="color:var(--error);font-weight:600;margin-bottom:12px;" x-text="'生成失败: ' + errorMsg"></p>
+        <a href="/" class="btn btn-outline">返回重试</a>
     </div>
 </div>
 
@@ -38,31 +34,18 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('progressView', () => ({
         events: [], done: false, error: false, errorMsg: '', draftId: null,
         async connect(runId) {
-            const resp = await fetch('/api/agent/generate', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({theme: '', images: [], ai_provider: ''}),
-            });
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+            const r = await fetch('/api/agent/generate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:'',images:[],ai_provider:''})});
+            const reader = r.body.getReader(); const d = new TextDecoder(); let buf = '';
             while (true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, {stream: true});
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            this.events.push(data);
-                            this.$nextTick(() => { const log = this.$refs.log; if (log) log.scrollTop = log.scrollHeight; });
-                            if (data.status === 'error') { this.error = true; this.errorMsg = data.message; }
-                            if (data.node === 'save_draft' && data.status === 'done') {
-                                this.done = true; this.draftId = data.data?.draft_id;
-                            }
-                        } catch(e) {}
-                    }
+                const {done, value} = await reader.read(); if (done) break;
+                buf += d.decode(value, {stream:true}); const lines = buf.split('\n'); buf = lines.pop();
+                for (const l of lines) {
+                    if (l.startsWith('data: ')) { try {
+                        const data = JSON.parse(l.slice(6)); this.events.push(data);
+                        this.$nextTick(() => { const log = this.$refs.log; if (log) log.scrollTop = log.scrollHeight; });
+                        if (data.status === 'error') { this.error = true; this.errorMsg = data.message; }
+                        if (data.node === 'save_draft' && data.status === 'done') { this.done = true; this.draftId = data.data?.draft_id; }
+                    } catch(e) {} }
                 }
             }
         },

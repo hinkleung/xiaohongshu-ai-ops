@@ -2,57 +2,55 @@
 {% block title %}首页 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
 <h1>生成小红书文案</h1>
-<p class="subtitle">输入活动主题，AI Agent 自动生成去 AI 味、合规的小红书图文</p>
+<p class="sub">输入活动主题，AI Agent 自动生成去 AI 味、合规的小红书图文</p>
 
 <form x-data="generatorForm" @submit.prevent="startGenerate" class="card" style="padding:28px;">
-    <div class="form-group">
-        <label class="form-label">活动主题</label>
-        <textarea x-model="theme" class="form-textarea" placeholder="例如：小鹏 G9 春日出行体验分享..." rows="3" required></textarea>
+    <div class="field">
+        <label>活动主题</label>
+        <textarea x-model="theme" class="textarea" placeholder="例如：小鹏 G9 春日出行体验分享…" rows="3" required></textarea>
     </div>
 
-    <div class="grid-2">
-        <div class="form-group">
-            <label class="form-label">AI Provider</label>
-            <select x-model="aiProvider" class="form-select" required>
-                <option value="">选择 AI...</option>
+    <div class="row">
+        <div class="field">
+            <label>AI Provider</label>
+            <select x-model="aiProvider" class="select" required>
+                <option value="">选择 AI…</option>
                 {% for c in configs %}
-                <option value="{{ c.provider }}" {% if c.is_active %}selected{% endif %}>
-                    {{ c.provider | upper }}
-                </option>
+                <option value="{{ c.provider }}" {% if c.is_active %}selected{% endif %}>{{ c.provider | upper }}</option>
                 {% endfor %}
             </select>
             {% if not configs %}
-            <p class="form-hint">⚠️ 尚未配置 AI，请先前往 <a href="/settings">设置</a></p>
+            <p class="hint">⚠️ 尚未配置 AI，请先前往 <a href="/settings" style="color:var(--accent);">设置</a></p>
             {% endif %}
         </div>
-        <div class="form-group">
-            <label class="form-label">图片上传</label>
-            <div class="file-upload-area" @click="$refs.images.click()" @dragover.prevent @drop.prevent="handleDrop($event)">
-                <input type="file" x-ref="images" multiple accept="image/*" class="form-input" style="display:none" @change="handleImages">
-                <p style="color:var(--color-text-muted);font-size:.85rem;">点击或拖拽上传图片（JPG/PNG/WebP）</p>
+        <div class="field">
+            <label>图片</label>
+            <div class="dropzone" @click="$refs.imgs.click()" @dragover.prevent @drop.prevent="handleDrop($event)">
+                <input type="file" x-ref="imgs" multiple accept="image/*" style="display:none" @change="handleImages">
+                <p style="color:var(--text-muted);font-size:.85rem;">点击或拖拽上传（JPG / PNG / WebP）</p>
             </div>
         </div>
     </div>
 
-    <div x-show="previews.length > 0" class="image-preview-grid">
+    <div x-show="previews.length > 0" class="thumbs">
         <template x-for="(url, i) in previews" :key="i">
-            <img :src="url" class="image-preview">
+            <img :src="url" class="thumb">
         </template>
     </div>
 
-    <button type="submit" :disabled="loading" class="btn btn-accent btn-lg" style="width:100%;margin-top:8px;">
+    <button type="submit" :disabled="loading" class="btn btn-accent" style="width:100%;margin-top:8px;padding:12px;font-size:.92rem;">
         <span x-show="!loading">✦ 开始生成</span>
-        <span x-show="loading">生成中...</span>
+        <span x-show="loading">生成中…</span>
     </button>
 </form>
 
-<div x-show="progress.length > 0" class="progress-log" x-ref="log" style="margin-top:24px;">
+<div x-show="progress.length > 0" class="log" x-ref="log">
     <template x-for="(p, i) in progress" :key="i">
-        <div class="progress-item animate-in">
-            <div :class="'progress-dot ' + p.status"></div>
+        <div class="log-line in">
+            <div :class="'log-dot ' + (p.status==='done'?'ok':p.status==='running'?'busy':'bad')"></div>
             <div>
-                <span x-text="p.message" :style="p.status === 'done' ? '' : 'opacity:.7'"></span>
-                <span x-show="p.data?.flagged_count" style="color:var(--color-warning)" x-text="'（' + p.data.flagged_count + '处疑似 AI 痕迹）'"></span>
+                <span x-text="p.message" :style="p.status==='done'?'color:var(--success)':''"></span>
+                <span x-show="p.data?.flagged_count" style="color:var(--warn);font-size:.8rem;" x-text="'（' + p.data.flagged_count + '处 AI 痕迹）'"></span>
             </div>
         </div>
     </template>

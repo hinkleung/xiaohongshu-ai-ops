@@ -53,13 +53,13 @@
     <div x-data="xhsStatus" x-init="checkStatus" class="card">
         <div class="flex">
             <p x-show="loading" style="color:var(--text-muted);">检查中…</p>
-            <span x-show="!loading && status?.logged_in" class="badge badge-published" style="font-size:.88rem;">已登录</span>
+            <span x-show="!loading && status?.is_logged_in" class="badge badge-published" style="font-size:.88rem;">已登录</span>
             <span x-show="!loading && status && !status.is_logged_in" class="badge badge-failed" style="font-size:.88rem;">未登录</span>
             <span x-show="status?.username" style="color:var(--text-secondary);" x-text="status.username"></span>
         </div>
         <div x-show="qrcode" style="text-align:center;margin-top:16px;">
             <p style="margin-bottom:10px;">用小红书 App 扫码登录</p>
-            <img :src="'data:image/png;base64,' + qrcode" style="max-width:240px;margin:0 auto;border-radius:12px;">
+            <img :src="qrcode" style="max-width:240px;margin:0 auto;border-radius:12px;">
         </div>
         <div class="flex mt-4">
             <button @click="checkStatus" class="btn btn-outline btn-sm">刷新</button>
@@ -98,7 +98,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('xhsStatus', () => ({
         status:null,loading:false,qrcode:null,
         async checkStatus(){this.loading=true;try{const r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
-        async getQRCode(){const r=await fetch('/api/xhs/login',{method:'POST'});const d=await r.json();this.qrcode=d.qrcode_base64;},
+        async getQRCode(){const r=await fetch('/api/xhs/login',{method:'POST'});const d=await r.json();this.qrcode=d.img;},
     }));
 });
 </script>

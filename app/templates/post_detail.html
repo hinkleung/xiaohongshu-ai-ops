@@ -2,44 +2,63 @@
 {% block title %}文章详情 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
 <div x-data="postEditor" x-init="init({{ post | tojson | safe }})">
-    <h2>文章详情</h2>
-    <div><span :class="'status-' + post.status" x-text="statusLabel(post.status)"></span></div>
-
-    <label>标题 <small x-text="'(' + (post.title?.length || 0) + '/20字)'"></small></label>
-    <input type="text" x-model="post.title" maxlength="20">
-
-    <label>正文</label>
-    <textarea x-model="post.content" rows="10"></textarea>
-
-    <label>标签</label>
-    <div>
-        <template x-for="(tag, i) in post.tags" :key="i">
-            <span class="tag" style="cursor:pointer;" @click="removeTag(i)" x-text="'#' + tag + ' ✕'"></span>
-        </template>
-        <input type="text" placeholder="添加标签..." @keydown.enter.prevent="addTag($event)" style="width:120px;display:inline-block;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+            <h1 style="margin-bottom:2px;">文章详情</h1>
+            <span :class="'badge badge-' + post.status" x-text="statusLabel(post.status)"></span>
+        </div>
+        <div class="flex-row gap-2">
+            <button @click="save" class="btn btn-primary btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                保存
+            </button>
+            <button @click="publish" x-show="post.status !== 'published'" class="btn btn-accent btn-sm">发布</button>
+            <button @click="regenerate" class="btn btn-ghost btn-sm">重新生成</button>
+        </div>
     </div>
 
-    <label>图片</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <template x-for="(img, i) in post.images" :key="i">
-            <div style="position:relative;">
-                <img :src="img" style="width:120px;height:120px;object-fit:cover;border-radius:6px;">
-                <button @click="removeImage(i)" style="position:absolute;top:2px;right:2px;padding:2px 6px;font-size:0.7em;">✕</button>
+    <div class="grid-2" style="margin-top:20px;">
+        <div class="form-group">
+            <label class="form-label">标题 <span style="color:var(--color-text-muted);font-weight:400;" x-text="'(' + (post.title?.length || 0) + '/20)'"></span></label>
+            <input type="text" x-model="post.title" class="form-input" maxlength="20">
+        </div>
+        <div class="form-group">
+            <label class="form-label">标签</label>
+            <div class="flex-row gap-2">
+                <template x-for="(tag, i) in post.tags" :key="i">
+                    <span class="tag">
+                        #<span x-text="tag"></span>
+                        <span class="tag-remove" @click="removeTag(i)">×</span>
+                    </span>
+                </template>
+                <input type="text" placeholder="+ 添加标签" @keydown.enter.prevent="addTag($event)"
+                    style="border:none;background:transparent;font-size:.82rem;width:90px;outline:none;color:var(--color-text-secondary);">
             </div>
-        </template>
+        </div>
     </div>
 
-    <div style="margin-top:1rem;">
-        <small x-text="'主题: ' + (post.theme || '-')"></small>
-        <small x-show="post.ai_provider" x-text="' · AI: ' + post.ai_provider"></small>
-        <small x-text="' · 创建于 ' + new Date(post.created_at).toLocaleString('zh-CN')"></small>
-        <small x-show="post.xhs_feed_id" x-text="' · Feed: ' + post.xhs_feed_id"></small>
+    <div class="form-group">
+        <label class="form-label">正文</label>
+        <textarea x-model="post.content" class="form-textarea" rows="12"></textarea>
     </div>
 
-    <div role="group" style="margin-top:1.5rem;">
-        <button @click="save">💾 保存</button>
-        <button @click="publish" x-show="post.status !== 'published'" class="secondary">🚀 发布</button>
-        <button @click="regenerate" class="secondary">🔄 重新生成</button>
+    <div class="form-group">
+        <label class="form-label">图片</label>
+        <div class="image-preview-grid">
+            <template x-for="(img, i) in post.images" :key="i">
+                <div style="position:relative;display:inline-block;">
+                    <img :src="img" class="image-preview" style="width:128px;height:128px;">
+                    <button @click="removeImage(i)" class="btn btn-danger btn-sm" style="position:absolute;top:2px;right:2px;padding:2px 6px;font-size:.65rem;">×</button>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <div style="font-size:.82rem;color:var(--color-text-muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--color-border);">
+        <span x-show="post.theme">主题：<span x-text="post.theme" style="color:var(--color-text-secondary);"></span> · </span>
+        <span x-show="post.ai_provider">AI：<span x-text="post.ai_provider" style="color:var(--color-text-secondary);"></span> · </span>
+        <span x-text="'创建于 ' + new Date(post.created_at).toLocaleString('zh-CN')"></span>
+        <span x-show="post.xhs_feed_id"> · FeedID：<code x-text="post.xhs_feed_id"></code></span>
     </div>
 </div>
 
@@ -52,19 +71,16 @@ document.addEventListener('alpine:init', () => {
         async save() {
             const resp = await fetch(`/api/posts/${this.post.id}`, {
                 method: 'PUT', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    title: this.post.title, content: this.post.content,
-                    tags: this.post.tags,
-                }),
+                body: JSON.stringify({ title: this.post.title, content: this.post.content, tags: this.post.tags }),
             });
-            if (resp.ok) alert('已保存');
+            if (resp.ok) this._flash('已保存');
             else alert('保存失败');
         },
         async publish() {
             const resp = await fetch(`/api/agent/${this.post.id}/publish`, {method: 'POST'});
             const data = await resp.json();
-            if (data.success) { this.post.status = 'published'; alert('发布成功！'); }
-            else alert('发布失败: ' + (data.error || 'unknown'));
+            if (data.success) { this.post.status = 'published'; this._flash('发布成功'); }
+            else alert('发布失败: ' + (data.error || ''));
         },
         async regenerate() { window.location.href = `/generate/${this.post.id}`; },
         addTag(e) {
@@ -74,6 +90,13 @@ document.addEventListener('alpine:init', () => {
         },
         removeTag(i) { this.post.tags.splice(i, 1); },
         removeImage(i) { this.post.images.splice(i, 1); },
+        _flash(msg) {
+            const el = document.createElement('div');
+            el.textContent = msg;
+            el.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--color-success);color:#fff;padding:8px 16px;border-radius:8px;font-size:.85rem;z-index:999;animation:fade-in-up .3s ease-out';
+            document.body.appendChild(el);
+            setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(() => el.remove(), 300); }, 2000);
+        },
     }));
 });
 </script>

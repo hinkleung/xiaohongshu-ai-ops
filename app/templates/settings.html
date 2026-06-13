@@ -1,74 +1,107 @@
 {% extends "base.html" %}
 {% block title %}设置 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
-<h2>设置</h2>
+<h1>设置</h1>
 
-<section>
-    <h3>AI Provider 配置</h3>
+<!-- AI Config Section -->
+<section class="section">
+    <h2>AI Provider 配置</h2>
+    <p class="subtitle">管理多个 AI 提供商，支持 OpenAI / Claude / DeepSeek</p>
+
     <div x-data="aiConfigManager">
-        <template x-for="(cfg, i) in configs" :key="cfg.id">
-            <article>
-                <header>
-                    <strong x-text="cfg.provider.toUpperCase()"></strong>
-                    <small x-show="cfg.is_active" style="color:var(--pico-primary);">● 当前使用</small>
-                </header>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.9em;">
-                    <div>Quick: <code x-text="cfg.quick_model"></code></div>
-                    <div>Deep: <code x-text="cfg.deep_model"></code></div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+            <template x-for="cfg in configs" :key="cfg.id">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title" style="display:flex;align-items:center;gap:8px;">
+                            <span x-text="cfg.provider.toUpperCase()"></span>
+                            <span x-show="cfg.is_active" class="badge badge-published">当前使用</span>
+                        </span>
+                    </div>
+                    <div class="grid-2" style="font-size:.85rem;color:var(--color-text-secondary);">
+                        <div>Quick: <code x-text="cfg.quick_model"></code></div>
+                        <div>Deep: <code x-text="cfg.deep_model"></code></div>
+                    </div>
+                    <div class="card-footer" style="border:none;padding-bottom:0;">
+                        <button @click="activate(cfg.id)" x-show="!cfg.is_active" class="btn btn-primary btn-sm">启用</button>
+                        <button @click="remove(cfg.id)" class="btn btn-ghost btn-sm" style="color:var(--color-destructive);">删除</button>
+                    </div>
                 </div>
-                <footer>
-                    <button @click="activate(cfg.id)" x-show="!cfg.is_active" style="font-size:0.85em;">启用</button>
-                    <button @click="remove(cfg.id)" class="secondary" style="font-size:0.85em;">删除</button>
-                </footer>
-            </article>
-        </template>
+            </template>
+        </div>
 
-        <details>
-            <summary>添加新 Provider</summary>
-            <form @submit.prevent="addConfig">
-                <label>Provider</label>
-                <select x-model="form.provider" required>
-                    <option value="">-- 选择 --</option>
-                    <option>openai</option>
-                    <option>claude</option>
-                    <option>deepseek</option>
-                </select>
-                <label>API Key</label>
-                <input type="password" x-model="form.api_key" required>
-                <label>API Base URL (可选)</label>
-                <input type="text" x-model="form.api_base" placeholder="留空使用默认">
-                <label>Quick Model</label>
-                <input type="text" x-model="form.quick_model" required placeholder="gpt-4o-mini">
-                <label>Deep Model</label>
-                <input type="text" x-model="form.deep_model" required placeholder="gpt-4o">
-                <button type="submit">保存</button>
+        <details style="cursor:pointer;">
+            <summary style="font-weight:500;padding:8px 0;color:var(--color-secondary);">＋ 添加新 Provider</summary>
+            <form @submit.prevent="addConfig" class="card" style="margin-top:12px;">
+                <div class="form-group">
+                    <label class="form-label">Provider</label>
+                    <select x-model="form.provider" class="form-select" required>
+                        <option value="">选择...</option>
+                        <option>openai</option>
+                        <option>claude</option>
+                        <option>deepseek</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input type="password" x-model="form.api_key" class="form-input" required placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Base URL <span style="font-weight:400;color:var(--color-text-muted);">（可选）</span></label>
+                    <input type="text" x-model="form.api_base" class="form-input" placeholder="留空使用默认">
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Quick Model</label>
+                        <input type="text" x-model="form.quick_model" class="form-input" required placeholder="gpt-4o-mini">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Deep Model</label>
+                        <input type="text" x-model="form.deep_model" class="form-input" required placeholder="gpt-4o">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-accent">保存配置</button>
             </form>
         </details>
     </div>
 </section>
 
-<section>
-    <h3>小红书账号</h3>
-    <div x-data="xhsStatus" x-init="checkStatus">
-        <p x-show="loading">检查中...</p>
-        <div x-show="!loading && status">
-            <p x-show="status.logged_in">✅ 已登录<span x-text="status.username ? ' (' + status.username + ')' : ''"></span></p>
-            <p x-show="!status.logged_in">❌ 未登录</p>
+<!-- XHS Account Section -->
+<section class="section">
+    <h2>小红书账号</h2>
+    <p class="subtitle">查看 MCP 登录状态，管理小红书账号连接</p>
+    <div x-data="xhsStatus" x-init="checkStatus" class="card">
+        <p x-show="loading" style="color:var(--color-text-muted);">检查中...</p>
+        <div x-show="!loading && status" style="display:flex;align-items:center;gap:12px;">
+            <span x-show="status.logged_in" class="badge badge-published" style="font-size:.9rem;">✅ 已登录</span>
+            <span x-show="!status.logged_in" class="badge badge-failed" style="font-size:.9rem;">❌ 未登录</span>
+            <span x-show="status.username" style="color:var(--color-text-secondary);" x-text="status.username"></span>
         </div>
-        <div x-show="qrcode">
-            <p>请用小红书 App 扫描二维码登录：</p>
-            <img :src="'data:image/png;base64,' + qrcode" style="max-width:300px;">
+        <div x-show="qrcode" class="mt-4" style="text-align:center;">
+            <p style="margin-bottom:12px;">用小红书 App 扫描二维码登录</p>
+            <img :src="'data:image/png;base64,' + qrcode" style="max-width:260px;margin:0 auto;border-radius:var(--radius);">
         </div>
-        <button @click="checkStatus">刷新状态</button>
-        <button @click="getQRCode" x-show="status && !status.logged_in">获取登录二维码</button>
+        <div class="flex-row mt-4">
+            <button @click="checkStatus" class="btn btn-secondary btn-sm">刷新状态</button>
+            <button @click="getQRCode" x-show="status && !status.logged_in" class="btn btn-accent btn-sm">获取登录二维码</button>
+        </div>
     </div>
 </section>
 
-<section>
-    <h3>MCP 运营入口</h3>
-    <p>MCP 服务运行在 <code>http://localhost:18060</code></p>
-    <a href="http://localhost:18060" target="_blank" role="button" class="secondary">🔗 打开 MCP 服务页面</a>
-    <small>MCP 提供了 REST API 和 MCP 协议端点，可在此查看服务状态。</small>
+<!-- MCP Info Section -->
+<section class="section">
+    <h2>MCP 服务</h2>
+    <p class="subtitle">xiaohongshu-mcp 后端服务信息</p>
+    <div class="card">
+        <div style="display:flex;align-items:center;gap:16px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--color-success);box-shadow:0 0 8px rgba(5,150,105,.4);"></div>
+            <div>
+                <p style="font-weight:500;">MCP 服务运行中</p>
+                <p style="font-size:.82rem;color:var(--color-text-secondary);">端点：<code>http://localhost:18060/mcp</code></p>
+                <p style="font-size:.8rem;color:var(--color-text-muted);">REST API：<code>/api/v1/*</code> · 支持扫码登录、发布、搜索等功能</p>
+            </div>
+        </div>
+    </div>
 </section>
 
 <script>
@@ -82,36 +115,32 @@ document.addEventListener('alpine:init', () => {
                 body: JSON.stringify(this.form),
             });
             if (resp.ok) {
-                const cfg = await resp.json();
-                this.configs.push(cfg);
+                this.configs.push(await resp.json());
                 this.form = {provider:'', api_key:'', api_base:'', quick_model:'', deep_model:''};
             }
         },
         async activate(id) {
             await fetch(`/api/configs/ai/${id}/activate`, {method: 'POST'});
-            this.configs.forEach(c => c.is_active = (c.id === id));
+            this.configs.forEach(c => c.is_active = c.id === id);
         },
         async remove(id) {
-            if (!confirm('确认删除？')) return;
+            if (!confirm('确认删除此配置？')) return;
             await fetch(`/api/configs/ai/${id}`, {method: 'DELETE'});
             this.configs = this.configs.filter(c => c.id !== id);
         },
     }));
-
     Alpine.data('xhsStatus', () => ({
         status: null, loading: false, qrcode: null,
         async checkStatus() {
             this.loading = true;
-            try {
-                const resp = await fetch('/api/xhs/status');
-                this.status = await resp.json();
-            } catch(e) { this.status = {logged_in: false}; }
+            try { const r = await fetch('/api/xhs/status'); this.status = await r.json(); }
+            catch(e) { this.status = {logged_in: false}; }
             this.loading = false;
         },
         async getQRCode() {
-            const resp = await fetch('/api/xhs/login', {method: 'POST'});
-            const data = await resp.json();
-            this.qrcode = data.qrcode_base64;
+            const r = await fetch('/api/xhs/login', {method: 'POST'});
+            const d = await r.json();
+            this.qrcode = d.qrcode_base64;
         },
     }));
 });

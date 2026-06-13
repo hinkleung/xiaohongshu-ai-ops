@@ -1,45 +1,46 @@
 {% extends "base.html" %}
 {% block title %}文章管理 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
-<h2>文章管理</h2>
+<h1>文章管理</h1>
+<p class="subtitle">管理草稿、已发布和失败的帖子</p>
 
 <div x-data="postList">
-    <div role="group">
-        <button @click="filter = ''" :class="filter === '' ? '' : 'outline'">全部</button>
-        <button @click="filter = 'draft'" :class="filter === 'draft' ? '' : 'outline'">草稿</button>
-        <button @click="filter = 'published'" :class="filter === 'published' ? '' : 'outline'">已发布</button>
-        <button @click="filter = 'failed'" :class="filter === 'failed' ? '' : 'outline'">失败</button>
+    <div class="tabs">
+        <button @click="filter = ''" :class="'tab ' + (filter === '' ? 'active' : '')">全部</button>
+        <button @click="filter = 'draft'" :class="'tab ' + (filter === 'draft' ? 'active' : '')">草稿</button>
+        <button @click="filter = 'published'" :class="'tab ' + (filter === 'published' ? 'active' : '')">已发布</button>
+        <button @click="filter = 'failed'" :class="'tab ' + (filter === 'failed' ? 'active' : '')">失败</button>
     </div>
 
-    <div style="margin-top:1rem;">
+    <div style="display:flex;flex-direction:column;gap:12px;">
         <template x-for="post in filteredPosts" :key="post.id">
-            <article class="post-card">
-                <header>
-                    <strong x-text="post.title || '(无标题)'"></strong>
-                    <small :class="'status-' + post.status" x-text="statusLabel(post.status)"></small>
-                </header>
-                <p x-text="(post.content || '').substring(0, 150) + '...'"></p>
-                <footer>
-                    <div>
-                        <template x-for="tag in post.tags" :key="tag">
-                            <span class="tag" x-text="'#' + tag"></span>
-                        </template>
-                    </div>
-                    <div style="margin-top:0.5rem;">
-                        <small x-text="'主题: ' + (post.theme || '-')"></small>
-                        <small x-text="' · ' + new Date(post.created_at).toLocaleDateString('zh-CN')"></small>
-                    </div>
-                    <div style="margin-top:0.5rem;">
-                        <a :href="'/posts/' + post.id" role="button" style="padding:4px 12px;font-size:0.85em;">查看/编辑</a>
-                        <button @click="deletePost(post.id)" style="padding:4px 12px;font-size:0.85em;" class="secondary">删除</button>
-                        <button x-show="post.status === 'draft'"
-                                @click="publishPost(post.id)"
-                                style="padding:4px 12px;font-size:0.85em;">发布</button>
-                    </div>
-                </footer>
-            </article>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title" x-text="post.title || '(无标题)'"></span>
+                    <span :class="'badge badge-' + post.status" x-text="statusLabel(post.status)"></span>
+                </div>
+                <div class="card-body" x-text="(post.content || '').substring(0, 200) + '...'"></div>
+                <div class="card-footer" style="border:none;padding-top:0;">
+                    <template x-for="tag in post.tags" :key="tag">
+                        <span class="tag" x-text="'#' + tag"></span>
+                    </template>
+                    <span style="flex:1;"></span>
+                    <span style="font-size:.8rem;color:var(--color-text-muted);" x-text="post.theme ? '主题: ' + post.theme : ''"></span>
+                    <span style="font-size:.8rem;color:var(--color-text-muted);" x-text="new Date(post.created_at).toLocaleDateString('zh-CN')"></span>
+                </div>
+                <div class="card-footer">
+                    <a :href="'/posts/' + post.id" class="btn btn-secondary btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        编辑
+                    </a>
+                    <button @click="deletePost(post.id)" class="btn btn-ghost btn-sm">删除</button>
+                    <button x-show="post.status === 'draft'" @click="publishPost(post.id)" class="btn btn-accent btn-sm">发布</button>
+                </div>
+            </div>
         </template>
-        <p x-show="filteredPosts.length === 0">暂无文章</p>
+        <div x-show="filteredPosts.length === 0" class="empty-state">
+            <p>暂无内容</p>
+        </div>
     </div>
 </div>
 
@@ -52,10 +53,10 @@ document.addEventListener('alpine:init', () => {
             return this.filter ? this.posts.filter(p => p.status === this.filter) : this.posts;
         },
         statusLabel(s) {
-            return {draft: '草稿', published: '已发布', failed: '发布失败'}[s] || s;
+            return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s;
         },
         async deletePost(id) {
-            if (!confirm('确认删除？')) return;
+            if (!confirm('确认删除？此操作不可撤销')) return;
             await fetch(`/api/posts/${id}`, {method: 'DELETE'});
             this.posts = this.posts.filter(p => p.id !== id);
         },

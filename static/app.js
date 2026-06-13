@@ -1,35 +1,29 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('generatorForm', () => ({
-        theme: '',
-        aiProvider: '',
-        images: [],
-        previews: [],
-        loading: false,
-        progress: [],
+        theme: '', aiProvider: '', images: [], previews: [],
+        loading: false, progress: [],
 
         handleImages(e) {
             this.images = Array.from(e.target.files);
             this.previews = this.images.map(f => URL.createObjectURL(f));
         },
 
-        async startGenerate() {
-            this.loading = true;
-            this.progress = [];
+        handleDrop(e) {
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            this.images = [...this.images, ...files];
+            this.previews = this.images.map(f => f instanceof File ? URL.createObjectURL(f) : f);
+        },
 
+        async startGenerate() {
+            this.loading = true; this.progress = [];
             const resp = await fetch('/api/agent/generate', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    theme: this.theme,
-                    images: [],
-                    ai_provider: this.aiProvider,
-                }),
+                body: JSON.stringify({ theme: this.theme, images: [], ai_provider: this.aiProvider }),
             });
-
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
-
             while (true) {
                 const {done, value} = await reader.read();
                 if (done) break;
@@ -41,18 +35,13 @@ document.addEventListener('alpine:init', () => {
                         try {
                             const data = JSON.parse(line.slice(6));
                             this.progress.push(data);
-                            this.$nextTick(() => {
-                                const log = this.$refs.log;
-                                if (log) log.scrollTop = log.scrollHeight;
-                            });
+                            this.$nextTick(() => { const log = this.$refs.log; if (log) log.scrollTop = log.scrollHeight; });
                             if (data.node === 'save_draft' && data.status === 'done') {
                                 this.loading = false;
-                                const draftId = data.data?.draft_id;
-                                if (draftId) window.location.href = `/posts/${draftId}`;
+                                const id = data.data?.draft_id;
+                                if (id) window.location.href = `/posts/${id}`;
                             }
-                            if (data.status === 'error') {
-                                this.loading = false;
-                            }
+                            if (data.status === 'error') this.loading = false;
                         } catch(e) {}
                     }
                 }

@@ -1,8 +1,11 @@
+import logging
 import os
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.config import DATABASE_PATH
+
+logger = logging.getLogger("app.db")
 
 engine = create_engine(
     f"sqlite:///{DATABASE_PATH}",
@@ -34,3 +37,4 @@ def get_db():
 def init_db():
     os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    logger.info("Database initialized at %s (WAL mode, FK enabled)", DATABASE_PATH)

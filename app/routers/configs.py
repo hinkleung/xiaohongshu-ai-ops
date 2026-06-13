@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db import get_db
@@ -5,6 +6,7 @@ from app.models import AIConfig
 from app.schemas import AIConfigCreate, AIConfigUpdate, AIConfigResponse
 from app.config import encrypt_api_key
 
+logger = logging.getLogger("app.configs")
 router = APIRouter(prefix="/api/configs/ai", tags=["AI Config"])
 
 
@@ -27,6 +29,7 @@ def create_config(data: AIConfigCreate, db: Session = Depends(get_db)):
     db.add(config)
     db.commit()
     db.refresh(config)
+    logger.info("AI config %d created provider=%s", config.id, config.provider)
     return config
 
 
@@ -56,6 +59,7 @@ def delete_config(config_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Config not found")
     db.delete(config)
     db.commit()
+    logger.info("AI config %d deleted provider=%s", config_id, config.provider)
 
 
 @router.post("/{config_id}/activate", response_model=AIConfigResponse)
@@ -67,4 +71,5 @@ def activate_config(config_id: int, db: Session = Depends(get_db)):
     config.is_active = True
     db.commit()
     db.refresh(config)
+    logger.info("AI config %d activated provider=%s", config_id, config.provider)
     return config

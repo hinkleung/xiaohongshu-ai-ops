@@ -1,7 +1,10 @@
+import logging
 from dataclasses import dataclass
 from typing import Optional, Literal
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
+
+logger = logging.getLogger("app.llm_factory")
 
 
 @dataclass
@@ -20,6 +23,7 @@ class LLMFactory:
     def create(config: ProviderConfig, tier: Literal["quick", "deep"]):
         model_name = config.quick_model if tier == "quick" else config.deep_model
         provider = config.provider.lower()
+        logger.info("Creating LLM: provider=%s tier=%s model=%s", provider, tier, model_name)
 
         if provider == "openai":
             kwargs = {"model": model_name, "api_key": config.api_key}

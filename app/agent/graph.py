@@ -1,3 +1,4 @@
+import logging
 from typing import Literal, AsyncIterator
 from langgraph.graph import StateGraph, END
 from app.agent.state import AgentState
@@ -10,6 +11,8 @@ from app.agent.nodes import (
     save_draft_node,
     publisher_node,
 )
+
+logger = logging.getLogger("app.agent.graph")
 from app.models import Post, AIConfig
 from app.services.llm_factory import LLMFactory
 
@@ -57,6 +60,7 @@ class AgentRunner:
         self, theme: str, images: list[str], ai_provider: str,
     ) -> AsyncIterator[dict]:
         """Run the generate flow, yielding progress events."""
+        logger.info("Agent run started: theme=%r provider=%r images=%d", theme[:80], ai_provider, len(images))
         db = self.db_session_factory()
         try:
             config = db.query(AIConfig).filter(

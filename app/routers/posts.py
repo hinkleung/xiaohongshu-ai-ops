@@ -1,9 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Post
 from app.schemas import PostCreate, PostUpdate, PostResponse
 
+logger = logging.getLogger("app.posts")
 router = APIRouter(prefix="/api/posts", tags=["Posts"])
 
 
@@ -25,7 +27,9 @@ def list_posts(status: str = Query(None), theme: str = Query(None), db: Session 
         q = q.filter(Post.status == status)
     if theme:
         q = q.filter(Post.theme.contains(theme))
-    return [_post_to_response(p) for p in q.all()]
+    result = [_post_to_response(p) for p in q.all()]
+    logger.debug("List posts status=%r theme=%r → %d results", status, theme, len(result))
+    return result
 
 
 @router.post("", response_model=PostResponse, status_code=201)
@@ -36,6 +40,7 @@ def create_post(data: PostCreate, db: Session = Depends(get_db)):
     db.add(post)
     db.commit()
     db.refresh(post)
+    logger.info("Post %d created theme=%r", post.id, post.theme)
     return _post_to_response(post)
 
 
@@ -43,6 +48,7 @@ def create_post(data: PostCreate, db: Session = Depends(get_db)):
 def get_post(post_id: int, db: Session = Depends(get_db)):
     post = db.query(Post).get(post_id)
     if not post:
+        logger.warning("Post %d not found", post_id)
         raise HTTPException(404, "Post not found")
     return _post_to_response(post)
 
@@ -62,6 +68,7 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db)):
         post.set_images(data.images)
     db.commit()
     db.refresh(post)
+    logger.info("Post %d updated", post_id)
     return _post_to_response(post)
 
 
@@ -72,3 +79,4 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Post not found")
     db.delete(post)
     db.commit()
+    logger.info("Post %d deleted", post_id)

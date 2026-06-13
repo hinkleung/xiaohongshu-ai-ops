@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import datetime
 from app.agent.state import AgentState
@@ -7,6 +8,8 @@ from app.agent.prompts import (
     AI_DETECTOR_PROMPT, HUMANIZER_PROMPT, XHS_OPTIMIZER_PROMPT,
 )
 from app.models import Post
+
+logger = logging.getLogger("app.agent.nodes")
 
 
 def parse_generated_content(text: str) -> tuple[str, str, list[str]]:
@@ -33,6 +36,7 @@ def parse_generated_content(text: str) -> tuple[str, str, list[str]]:
 
 async def theme_analyzer_node(state: AgentState, quick_llm, db) -> dict:
     """Node 1: Analyze theme -> style, keywords, audience."""
+    logger.info("Node 1 theme_analyzer: theme=%r", state.get("theme", "")[:80])
     prompt = THEME_ANALYZER_PROMPT.format(theme=state["theme"])
     resp = quick_llm.invoke(prompt)
     content = resp.content if hasattr(resp, 'content') else str(resp)
@@ -43,6 +47,7 @@ async def theme_analyzer_node(state: AgentState, quick_llm, db) -> dict:
 
 async def content_generator_node(state: AgentState, quick_llm, db) -> dict:
     """Node 2: Generate initial post draft."""
+    logger.info("Node 2 content_generator: generating draft")
     analysis = state.get("theme_analysis", {})
     prompt = CONTENT_GENERATOR_PROMPT.format(
         theme=state["theme"],
@@ -57,6 +62,7 @@ async def content_generator_node(state: AgentState, quick_llm, db) -> dict:
 
 async def ai_detector_node(state: AgentState, deep_llm, db) -> dict:
     """Node 3: Detect AI traces in generated content."""
+    logger.info("Node 3 ai_detector: scanning for AI traces")
     prompt = AI_DETECTOR_PROMPT.format(content=state["draft_content"])
     resp = deep_llm.invoke(prompt)
     content = resp.content if hasattr(resp, 'content') else str(resp)
@@ -71,6 +77,7 @@ async def ai_detector_node(state: AgentState, deep_llm, db) -> dict:
 
 async def humanizer_node(state: AgentState, deep_llm, db) -> dict:
     """Node 4: Rewrite AI-sounding sections to sound human."""
+    logger.info("Node 4 humanizer: rewriting flagged sections")
     prompt = HUMANIZER_PROMPT.format(
         content=state["draft_content"],
         flagged_sections=json.dumps(state.get("flagged_sections", []), ensure_ascii=False),
@@ -82,6 +89,7 @@ async def humanizer_node(state: AgentState, deep_llm, db) -> dict:
 
 async def xhs_optimizer_node(state: AgentState, deep_llm, db) -> dict:
     """Node 5: Enforce XHS platform rules."""
+    logger.info("Node 5 xhs_optimizer: applying platform rules")
     source = state.get("humanized_content") or state["draft_content"]
     title, body, _ = parse_generated_content(source)
     prompt = XHS_OPTIMIZER_PROMPT.format(content=source, title_len=len(title), body_len=len(body))
@@ -100,6 +108,7 @@ async def xhs_optimizer_node(state: AgentState, deep_llm, db) -> dict:
 
 async def save_draft_node(state: AgentState, llm, db) -> dict:
     """Node 6: Persist draft to SQLite."""
+    logger.info("Node 6 save_draft: persisting to DB")
     post = Post(
         title=state.get("final_title", ""),
         content=state.get("final_content", ""),
@@ -117,6 +126,7 @@ async def save_draft_node(state: AgentState, llm, db) -> dict:
 
 async def publisher_node(state: AgentState, llm, db) -> dict:
     """Node 7: Publish to Xiaohongshu via MCP."""
+    logger.info("Node 7 publisher: publishing to XHS")
     from app.services.xhs_client import XHSClient
     from app.agent.tools import MCP_BASE_URL
 

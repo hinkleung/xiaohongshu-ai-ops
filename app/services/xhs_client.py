@@ -1,5 +1,8 @@
+import logging
 from typing import Optional
 import httpx
+
+logger = logging.getLogger("app.xhs_client")
 
 
 class XHSClient:
@@ -21,11 +24,13 @@ class XHSClient:
         return f"{self.base_url}/api/v1{path}"
 
     async def _get(self, path: str) -> dict:
+        logger.debug("MCP GET %s", path)
         resp = await self._client.get(self._url(path))
         resp.raise_for_status()
         return resp.json()
 
     async def _post(self, path: str, data: dict) -> dict:
+        logger.debug("MCP POST %s", path)
         resp = await self._client.post(self._url(path), json=data)
         resp.raise_for_status()
         return resp.json()

@@ -21,7 +21,7 @@
                 </div>
                 <div class="flex" style="margin-top:10px;">
                     <button @click="activate(cfg.id)" x-show="!cfg.is_active" class="btn btn-outline btn-sm">启用</button>
-                    <button @click="askDelete(cfg.id)" class="btn btn-ghost btn-sm" style="color:var(--error);">删除</button>
+                    <button @click="deleteConfig(cfg.id)" class="btn btn-ghost btn-sm" style="color:var(--error);">删除</button>
                 </div>
             </div>
         </template>
@@ -60,12 +60,12 @@
         <div class="flex mt-4">
             <button @click="checkStatus" class="btn btn-outline btn-sm">刷新状态</button>
             <button @click="showQRModal()" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
-            <button @click="confirmLogout=true" x-show="status?.is_logged_in" class="btn btn-ghost btn-sm" style="color:var(--color-error);">退出登录</button>
+            <button @click="showLogoutModal()" x-show="status?.is_logged_in" class="btn btn-ghost btn-sm" style="color:var(--color-error);">退出登录</button>
         </div>
     </div>
 </div>
 
-<!-- QR Modal — outside Alpine scope, controlled by vanilla JS -->
+<!-- QR Modal -->
 <div id="qr-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
     <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:380px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
         <h3 style="margin-bottom:6px;font-size:1.1rem;text-align:center;color:var(--color-text);">扫码登录小红书</h3>
@@ -83,32 +83,50 @@
     </div>
 </div>
 
-<!-- Delete confirm modal -->
-<div x-show="confirmTarget" class="modal-overlay" @click.self="cancelDelete" @keydown.escape="cancelDelete" style="display:flex;">
+<!-- Delete Confirm Modal -->
+<div id="delete-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
     <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <h3 style="margin-bottom:10px;font-size:1.1rem;">确认删除</h3>
-        <p style="color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">此操作不可撤销，确定要删除这个 Provider 吗？</p>
+        <h3 style="margin-bottom:10px;font-size:1.1rem;text-align:center;">确认删除</h3>
+        <p style="text-align:center;color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">此操作不可撤销，确定要删除这个 Provider 吗？</p>
         <div style="display:flex;gap:10px;justify-content:center;">
-            <button @click="cancelDelete" class="btn btn-outline">取消</button>
-            <button @click="doDelete" class="btn btn-danger">确认删除</button>
+            <button onclick="closeDeleteModal()" class="btn btn-outline">取消</button>
+            <button id="delete-confirm-btn" class="btn btn-danger">确认删除</button>
         </div>
     </div>
 </div>
 
-<!-- Logout confirm modal -->
-<div x-show="confirmLogout" class="modal-overlay" @click.self="confirmLogout=false" @keydown.escape="confirmLogout=false" style="display:flex;">
+<!-- Logout Confirm Modal -->
+<div id="logout-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
     <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <h3 style="margin-bottom:10px;font-size:1.1rem;">确认退出</h3>
-        <p style="color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">确定要退出小红书登录吗？</p>
+        <h3 style="margin-bottom:10px;font-size:1.1rem;text-align:center;">确认退出</h3>
+        <p style="text-align:center;color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">确定要退出小红书登录吗？</p>
         <div style="display:flex;gap:10px;justify-content:center;">
-            <button @click="confirmLogout=false" class="btn btn-outline">取消</button>
-            <button @click="doLogout" class="btn btn-danger">确认退出</button>
+            <button onclick="closeLogoutModal()" class="btn btn-outline">取消</button>
+            <button onclick="confirmLogout()" class="btn btn-danger">确认退出</button>
+        </div>
+    </div>
+</div>
+
+<div class="sec">
+    <h2>MCP 服务</h2>
+    <p class="sub">xiaohongshu-mcp 后端</p>
+    <div class="card">
+        <div class="flex" style="gap:12px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px rgba(22,163,74,.4);"></div>
+            <div>
+                <p style="font-weight:500;">服务运行中</p>
+                <p style="font-size:.84rem;color:var(--text-secondary);">MCP <code>localhost:18060/mcp</code></p>
+                <p style="font-size:.8rem;color:var(--text-muted);">REST <code>/api/v1/*</code></p>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+/* ==================== QR Modal ==================== */
 var qrTimer = null;
+
+function onQrEsc(e) { if (e.key === 'Escape') closeQRModal(); }
 
 function parseTimeout(t) {
     var m = t.match(/(\d+)m/), s = t.match(/(\d+)s/);
@@ -119,8 +137,6 @@ function formatCountdown(sec) {
     return Math.floor(sec / 60) + '分' + (sec % 60) + '秒';
 }
 
-function onEsc(e) { if (e.key === 'Escape') closeQRModal(); }
-
 async function showQRModal() {
     var m = document.getElementById('qr-modal');
     var loading = document.getElementById('qr-loading');
@@ -128,8 +144,9 @@ async function showQRModal() {
     var img = document.getElementById('qr-image');
     var expire = document.getElementById('qr-expire');
     if (qrTimer) clearInterval(qrTimer);
+    img.style.opacity = '1';
     m.style.display = 'flex';
-    document.addEventListener('keydown', onEsc);
+    document.addEventListener('keydown', onQrEsc);
     loading.style.display = 'block';
     content.style.display = 'none';
     expire.style.display = 'none';
@@ -163,49 +180,85 @@ async function showQRModal() {
 
 function closeQRModal() {
     if (qrTimer) clearInterval(qrTimer);
-    document.removeEventListener('keydown', onEsc);
+    document.removeEventListener('keydown', onQrEsc);
     document.getElementById('qr-modal').style.display = 'none';
     window.dispatchEvent(new CustomEvent('xhs-refresh'));
 }
-</script>
 
-<div class="sec">
-    <h2>MCP 服务</h2>
-    <p class="sub">xiaohongshu-mcp 后端</p>
-    <div class="card">
-        <div class="flex" style="gap:12px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px rgba(22,163,74,.4);"></div>
-            <div>
-                <p style="font-weight:500;">服务运行中</p>
-                <p style="font-size:.84rem;color:var(--text-secondary);">MCP <code>localhost:18060/mcp</code></p>
-                <p style="font-size:.8rem;color:var(--text-muted);">REST <code>/api/v1/*</code></p>
-            </div>
-        </div>
-    </div>
-</div>
+/* ==================== Delete Modal ==================== */
+var deleteTargetId = null;
 
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('aiConfigManager', () => ({
-        configs: {{ configs | tojson | safe }},
-        form: {provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''},
-        confirmTarget: null,
-        async addConfig() {
-            const r = await fetch('/api/configs/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.form)});
-            if(r.ok){this.configs.push(await r.json());this.form={provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''};
-                this.$el.querySelector('details').open = false;}
-        },
-        async activate(id){await fetch(`/api/configs/ai/${id}/activate`,{method:'POST'});this.configs.forEach(c=>c.is_active=c.id===id);},
-        askDelete(id){this.confirmTarget=id;},
-        async doDelete(){var id=this.confirmTarget;this.confirmTarget=null;await fetch(`/api/configs/ai/${id}`,{method:'DELETE'});this.configs=this.configs.filter(c=>c.id!==id);},
-        cancelDelete(){this.confirmTarget=null;},
-    }));
-    Alpine.data('xhsStatus', () => ({
-        status:null,loading:false,confirmLogout:false,
-        init(){this.checkStatus();window.addEventListener('xhs-refresh',()=>this.checkStatus());},
-        async checkStatus(){this.loading=true;try{const r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
-        async doLogout(){await fetch('/api/xhs/logout',{method:'DELETE'});this.confirmLogout=false;await this.checkStatus();},
-    }));
+function showDeleteModal(id) {
+    deleteTargetId = id;
+    document.getElementById('delete-modal').style.display = 'flex';
+    document.addEventListener('keydown', onDeleteEsc);
+}
+
+function onDeleteEsc(e) { if (e.key === 'Escape') closeDeleteModal(); }
+
+function closeDeleteModal() {
+    deleteTargetId = null;
+    document.removeEventListener('keydown', onDeleteEsc);
+    document.getElementById('delete-modal').style.display = 'none';
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', async function() {
+    var id = deleteTargetId;
+    closeDeleteModal();
+    await fetch('/api/configs/ai/' + id, {method: 'DELETE'});
+    // Trigger Alpine refresh
+    window.dispatchEvent(new CustomEvent('configs-changed'));
+});
+
+/* ==================== Logout Modal ==================== */
+function showLogoutModal() {
+    document.getElementById('logout-modal').style.display = 'flex';
+    document.addEventListener('keydown', onLogoutEsc);
+}
+
+function onLogoutEsc(e) { if (e.key === 'Escape') closeLogoutModal(); }
+
+function closeLogoutModal() {
+    document.removeEventListener('keydown', onLogoutEsc);
+    document.getElementById('logout-modal').style.display = 'none';
+}
+
+async function confirmLogout() {
+    closeLogoutModal();
+    await fetch('/api/xhs/logout', {method: 'DELETE'});
+    window.dispatchEvent(new CustomEvent('xhs-refresh'));
+}
+
+/* ==================== Alpine Components ==================== */
+document.addEventListener('alpine:init', function() {
+    Alpine.data('aiConfigManager', function() {
+        var self = this;
+        return {
+            configs: {{ configs | tojson | safe }},
+            form: {provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''},
+            init: function() {
+                window.addEventListener('configs-changed', function() {
+                    // Reload configs from API
+                    fetch('/api/configs/ai').then(function(r){return r.json();}).then(function(d){self.configs = d;});
+                });
+            },
+            addConfig: async function() {
+                var r = await fetch('/api/configs/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.form)});
+                if(r.ok){this.configs.push(await r.json());this.form={provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''};
+                    this.$el.querySelector('details').open = false;}
+            },
+            activate: async function(id){await fetch('/api/configs/ai/'+id+'/activate',{method:'POST'});this.configs.forEach(function(c){c.is_active=c.id===id;});},
+            deleteConfig: function(id){showDeleteModal(id);},
+        };
+    });
+
+    Alpine.data('xhsStatus', function() {
+        return {
+            status:null,loading:false,
+            init: function(){var c=this;c.checkStatus();window.addEventListener('xhs-refresh',function(){c.checkStatus();});},
+            checkStatus: async function(){this.loading=true;try{var r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
+        };
+    });
 });
 </script>
 {% endblock %}

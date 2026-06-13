@@ -26,7 +26,7 @@
             </div>
         </template>
 
-        <details style="cursor:pointer;margin-top:12px;">
+        <details id="add-provider-panel" style="cursor:pointer;margin-top:12px;">
             <summary style="font-weight:500;padding:8px 0;color:var(--accent);">＋ 添加新 Provider</summary>
             <form @submit.prevent="addConfig" class="card" style="margin-top:10px;">
                 <div class="field">
@@ -244,7 +244,7 @@ document.addEventListener('alpine:init', function() {
             addConfig: async function() {
                 var r = await fetch('/api/configs/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.form)});
                 if(r.ok){this.configs.push(await r.json());this.form={provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''};
-                    this.$el.querySelector('details').open = false;}
+                    var self=this;this.$nextTick(function(){document.getElementById('add-provider-panel').open=false;});}
             },
             activate: async function(id){await fetch('/api/configs/ai/'+id+'/activate',{method:'POST'});this.configs.forEach(function(c){c.is_active=c.id===id;});},
             deleteConfig: function(id){showDeleteModal(id);},

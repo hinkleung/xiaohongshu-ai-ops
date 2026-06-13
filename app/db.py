@@ -4,8 +4,6 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.config import DATABASE_PATH
 
-os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
-
 engine = create_engine(
     f"sqlite:///{DATABASE_PATH}",
     connect_args={"check_same_thread": False},
@@ -34,4 +32,5 @@ def get_db():
 
 
 def init_db():
+    os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
     Base.metadata.create_all(bind=engine)

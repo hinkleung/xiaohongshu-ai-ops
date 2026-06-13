@@ -50,7 +50,7 @@
 <div class="sec">
     <h2>小红书账号</h2>
     <p class="sub">管理 MCP 连接和登录状态</p>
-    <div x-data="xhsStatus" x-init="checkStatus" class="card">
+    <div x-data="xhsStatus" class="card">
         <!-- Status row -->
         <div class="flex">
             <p x-show="loading" style="color:var(--text-muted);">检查中…</p>
@@ -306,7 +306,8 @@ async function confirmLogout() {
     closeLogoutModal();
     await fetch('/api/xhs/logout', {method: 'DELETE'});
     try { localStorage.removeItem('xhs_login_cache'); } catch(e) {}
-    window.dispatchEvent(new CustomEvent('xhs-refresh'));
+    // Don't call status API — just update UI directly
+    window.dispatchEvent(new CustomEvent('xhs-logout'));
 }
 
 /* ==================== Alpine Components ==================== */
@@ -347,12 +348,17 @@ document.addEventListener('alpine:init', function() {
             status:{},loading:false,profile:null,loadingProfile:false,
             init: function(){
                 var c=this;
-                // Restore from cache for instant display — no loading flash
                 var cached = readCache();
-                if (cached) { this.status = cached.status || {}; this.profile = cached.profile; }
-                // Always refresh in background to catch expiry
-                c.checkStatus(false, !!cached);
+                if (cached) {
+                    // Use cached data immediately — no API call needed
+                    this.status = cached.status || {};
+                    this.profile = cached.profile;
+                } else {
+                    // First visit or cache expired — must check
+                    c.checkStatus();
+                }
                 window.addEventListener('xhs-refresh',function(e){var poll=e.detail&&e.detail.poll;c.checkStatus(poll);});
+                window.addEventListener('xhs-logout',function(){c.status={is_logged_in:false};c.profile=null;});
             },
             checkStatus: async function(poll, silent){
                 if (!silent) this.loading = true;

@@ -80,4 +80,19 @@
         </div>
     </template>
 </div>
+
+<!-- Done Modal -->
+<div x-show="showDoneModal" x-cloak style="display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;" @click.self="closeDoneModal">
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:360px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--success);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+            <span style="color:#fff;font-size:1.6rem;">✓</span>
+        </div>
+        <h3 style="margin-bottom:6px;">生成成功</h3>
+        <p style="color:var(--text-secondary);font-size:.84rem;margin-bottom:24px;">文案已保存为草稿，可以前往文章详情查看</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button @click="stayAndReset" class="btn btn-outline">留在首页</button>
+            <button @click="goToPost" class="btn btn-accent">查看详情</button>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -39,11 +39,42 @@
     </div>
 </div>
 
+<div id="posts-delete-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+        <h3 style="margin-bottom:10px;font-size:1.1rem;text-align:center;">确认删除</h3>
+        <p style="text-align:center;color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">此操作不可撤销，确定要删除这篇文章吗？</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button onclick="closePostsDeleteModal()" class="btn btn-outline">取消</button>
+            <button onclick="confirmPostsDelete()" class="btn btn-danger">确认删除</button>
+        </div>
+    </div>
+</div>
+
 <script>
+function showPostsDeleteModal() { document.getElementById('posts-delete-modal').style.display = 'flex'; document.addEventListener('keydown', onPostsDeleteEsc); }
+function onPostsDeleteEsc(e) { if (e.key === 'Escape') closePostsDeleteModal(); }
+function closePostsDeleteModal() { document.removeEventListener('keydown', onPostsDeleteEsc); document.getElementById('posts-delete-modal').style.display = 'none'; }
+function confirmPostsDelete() {
+    var id = window._deletePostId; closePostsDeleteModal();
+    fetch('/api/posts/' + id, {method: 'DELETE'}).then(function() {
+        window.dispatchEvent(new CustomEvent('posts-deleted', {detail: id}));
+    });
+}
+function postsFlash(msg, isError) {
+    var e = document.createElement('div'); e.textContent = msg;
+    e.style.cssText = 'position:fixed;top:20px;right:20px;background:' + (isError ? 'var(--color-error)' : 'var(--color-success)') + ';color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out';
+    document.body.appendChild(e); setTimeout(function(){e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(function(){e.remove()},300)},2000);
+}
 document.addEventListener('alpine:init', () => {
     Alpine.data('postList', () => ({
         filter: '',
         posts: {{ posts | tojson | safe }},
+        init() {
+            var self = this;
+            window.addEventListener('posts-deleted', function(e) {
+                self.posts = self.posts.filter(p => p.id !== e.detail);
+            });
+        },
         get filteredPosts() {
             return this.filter ? this.posts.filter(p => p.status === this.filter) : this.posts;
         },
@@ -51,15 +82,14 @@ document.addEventListener('alpine:init', () => {
             return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s;
         },
         async deletePost(id) {
-            if (!confirm('确认删除？此操作不可撤销')) return;
-            await fetch(`/api/posts/${id}`, {method: 'DELETE'});
-            this.posts = this.posts.filter(p => p.id !== id);
+            window._deletePostId = id;
+            showPostsDeleteModal();
         },
         async publishPost(id) {
             const r = await fetch(`/api/agent/${id}/publish`, {method: 'POST'});
             const d = await r.json();
-            if (d.success) { const p = this.posts.find(x => x.id === id); if (p) p.status = 'published'; }
-            else alert('发布失败: ' + (d.error || ''));
+            if (d.success) { const p = this.posts.find(x => x.id === id); if (p) p.status = 'published'; postsFlash('发布成功'); }
+            else postsFlash('发布失败: ' + (d.error || ''), true);
         },
     }));
 });

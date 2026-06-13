@@ -232,14 +232,13 @@ async function confirmLogout() {
 /* ==================== Alpine Components ==================== */
 document.addEventListener('alpine:init', function() {
     Alpine.data('aiConfigManager', function() {
-        var self = this;
         return {
             configs: {{ configs | tojson | safe }},
             form: {provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''},
             init: function() {
+                var component = this;
                 window.addEventListener('configs-changed', function() {
-                    // Reload configs from API
-                    fetch('/api/configs/ai').then(function(r){return r.json();}).then(function(d){self.configs = d;});
+                    fetch('/api/configs/ai').then(function(r){return r.json();}).then(function(d){component.configs = d;});
                 });
             },
             addConfig: async function() {

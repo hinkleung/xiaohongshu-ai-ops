@@ -68,7 +68,7 @@ document.addEventListener('alpine:init', () => {
         },
         async publish() {
             const r = await fetch(`/api/agent/${this.post.id}/publish`,{method:'POST'});const d=await r.json();
-            if(d.success){this.post.status='published';flash('发布成功');}else alert('发布失败: '+d.error);
+            if(d.success){this.post.status='published';flash('发布成功');}else flash('发布失败: '+(d.error||''),true);
         },
         async regenerate() { window.location.href = `/generate/${this.post.id}`; },
         addTag(e) { const t = e.target.value.trim(); if (t && !this.post.tags.includes(t)) this.post.tags.push(t); e.target.value = ''; },
@@ -76,9 +76,9 @@ document.addEventListener('alpine:init', () => {
         removeImage(i) { this.post.images.splice(i,1); },
     }));
 });
-function flash(msg) {
+function flash(msg, isError) {
     var e=document.createElement('div');e.textContent=msg;
-    e.style.cssText='position:fixed;top:20px;right:20px;background:var(--success);color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out';
+    e.style.cssText='position:fixed;top:20px;right:20px;background:'+(isError?'var(--color-error)':'var(--color-success)')+';color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out';
     document.body.appendChild(e);setTimeout(function(){e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(function(){e.remove()},300)},2000);
 }
 </script>

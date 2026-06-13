@@ -84,30 +84,59 @@
 </div>
 
 <script>
+var qrTimer = null;
+
+function parseTimeout(t) {
+    var m = t.match(/(\d+)m/), s = t.match(/(\d+)s/);
+    return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0);
+}
+
+function formatCountdown(sec) {
+    return Math.floor(sec / 60) + '分' + (sec % 60) + '秒';
+}
+
 async function showQRModal() {
     var m = document.getElementById('qr-modal');
     var loading = document.getElementById('qr-loading');
     var content = document.getElementById('qr-content');
     var img = document.getElementById('qr-image');
     var expire = document.getElementById('qr-expire');
+    if (qrTimer) clearInterval(qrTimer);
     m.style.display = 'flex';
     loading.style.display = 'block';
     content.style.display = 'none';
+    expire.style.display = 'none';
     try {
         var r = await fetch('/api/xhs/login', {method:'POST'});
         var d = await r.json();
         img.src = d.img;
-        if (d.timeout) { expire.textContent = '有效期：' + d.timeout; expire.style.display = 'block'; }
         loading.style.display = 'none';
         content.style.display = 'block';
+        if (d.timeout) {
+            var sec = parseTimeout(d.timeout);
+            if (sec > 0) {
+                expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
+                expire.style.display = 'block';
+                qrTimer = setInterval(function() {
+                    sec--;
+                    if (sec <= 0) {
+                        clearInterval(qrTimer);
+                        expire.textContent = '二维码已过期，请重新获取';
+                        img.style.opacity = '0.3';
+                    } else {
+                        expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
+                    }
+                }, 1000);
+            }
+        }
     } catch(e) {
         loading.textContent = '获取失败，请重试';
     }
 }
 
 function closeQRModal() {
+    if (qrTimer) clearInterval(qrTimer);
     document.getElementById('qr-modal').style.display = 'none';
-    // Trigger Alpine refresh via event
     window.dispatchEvent(new CustomEvent('xhs-refresh'));
 }
 </script>

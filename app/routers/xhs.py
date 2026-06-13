@@ -12,7 +12,7 @@ async def get_xhs_status():
     try:
         async with XHSClient(base_url=XHS_MCP_URL) as client:
             result = await client.check_login_status()
-            logger.info("XHS status checked: logged_in=%s", result.get("logged_in"))
+            logger.info("XHS status: is_logged_in=%s", result.get("is_logged_in"))
             return result
     except Exception as e:
         logger.error("MCP unreachable: %s", e)

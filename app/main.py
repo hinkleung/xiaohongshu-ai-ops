@@ -1,6 +1,8 @@
 import logging
 import sys
-from fastapi import FastAPI, Depends, Request
+import os
+import uuid
+from fastapi import FastAPI, Depends, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -59,6 +61,24 @@ def get_stats(db: Session = Depends(get_db)):
         Post.publish_time >= datetime.now(timezone.utc).replace(day=1),
     ).count()
     return {"drafts": total_drafts, "published": total_published, "this_month": this_month}
+
+
+@app.post("/api/upload")
+async def upload_images(files: list[UploadFile] = File(...)):
+    """Upload images, return relative URLs for the generation flow."""
+    from app.config import UPLOADS_DIR
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    urls = []
+    for f in files:
+        ext = os.path.splitext(f.filename or ".jpg")[1] or ".jpg"
+        name = f"{uuid.uuid4().hex}{ext}"
+        path = os.path.join(UPLOADS_DIR, name)
+        content = await f.read()
+        with open(path, "wb") as out:
+            out.write(content)
+        urls.append(f"/uploads/{name}")
+    logger.info("Uploaded %d images", len(urls))
+    return {"urls": urls}
 
 
 @app.on_event("startup")

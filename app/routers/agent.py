@@ -1,8 +1,10 @@
 import json
 import logging
+import asyncio
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 from app.db import SessionLocal
+from app.models import Post
 from app.schemas import GenerateRequest
 from app.agent.graph import AgentRunner
 
@@ -36,14 +38,47 @@ async def trigger_generate(req: GenerateRequest, request: Request):
 
 @router.post("/{post_id}/publish")
 async def trigger_publish(post_id: int):
+    """Start async publish — sets status to 'publishing', returns immediately."""
     logger.info("Publish requested for post %s", post_id)
+    db = SessionLocal()
+    try:
+        post = db.query(Post).get(post_id)
+        if not post:
+            return {"success": False, "error": "Post not found"}
+        if post.status == "publishing":
+            logger.info("Re-publish requested while publishing — allowing retry")
+        post.status = "publishing"
+        db.commit()
+    finally:
+        db.close()
+
+    # Fire-and-forget background publish
+    asyncio.create_task(_background_publish(post_id))
+
+    return {"success": True, "message": "发布任务已提交", "status": "publishing"}
+
+
+async def _background_publish(post_id: int):
+    """Background task: run publish via MCP, then update post status."""
+    logger.info("Background publish started for post %s", post_id)
     runner = _get_runner()
     result = await runner.run_publish(post_id)
-    if result.get("error"):
-        logger.error("Publish post %s failed: %s", post_id, result["error"])
-        return {"success": False, "error": result["error"]}
-    logger.info("Post %s published successfully", post_id)
-    return {"success": True}
+
+    db = SessionLocal()
+    try:
+        post = db.query(Post).get(post_id)
+        if not post:
+            logger.warning("Background publish: post %s vanished", post_id)
+            return
+        if result.get("error"):
+            post.status = "failed"
+            logger.error("Background publish post %s failed: %s", post_id, result["error"])
+        else:
+            post.status = "published"
+            logger.info("Background publish post %s succeeded", post_id)
+        db.commit()
+    finally:
+        db.close()
 
 
 @router.post("/{post_id}/regenerate")

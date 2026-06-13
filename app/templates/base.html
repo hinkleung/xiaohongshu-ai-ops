@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}小红书 AI 运营平台{% endblock %}</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
     <script defer src="/static/app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -152,8 +152,10 @@
             border-radius: 20px; font-size: .76rem; font-weight: 500;
         }
         .badge-draft { background: var(--bg-hover); color: var(--text-muted); }
+        .badge-publishing { background: #fffbeb; color: var(--warn); animation: pulse .9s ease-in-out infinite; }
         .badge-published { background: #ecfdf5; color: var(--success); }
         .badge-failed { background: #fef2f2; color: var(--error); }
+        [data-theme="dark"] .badge-publishing { background: #2d1a04; }
         [data-theme="dark"] .badge-published { background: #052e16; }
         [data-theme="dark"] .badge-failed { background: #2e0505; }
 

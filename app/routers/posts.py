@@ -80,3 +80,48 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
     db.delete(post)
     db.commit()
     logger.info("Post %d deleted", post_id)
+
+
+@router.post("/sync-publishing")
+async def sync_publishing_status(db: Session = Depends(get_db)):
+    """Cross-check all 'publishing' posts against MCP feed list.
+    Called passively when the user opens the posts list page."""
+    publishing = db.query(Post).filter(Post.status == "publishing").all()
+    if not publishing:
+        return {"updated": 0}
+
+    from app.services.xhs_client import XHSClient
+    from app.config import XHS_MCP_URL
+    from datetime import datetime as dt, timezone
+
+    updated = 0
+    try:
+        async with XHSClient(base_url=XHS_MCP_URL) as client:
+            raw = await client.get_my_profile()
+            profile = raw.get("data", raw) if isinstance(raw, dict) else {}
+            feeds = profile.get("feeds") or []
+            feed_titles = {}
+            for f in feeds:
+                card = (f.get("noteCard") or {}) if isinstance(f, dict) else {}
+                t = card.get("displayTitle", "")
+                if t:
+                    feed_titles[t] = f.get("id")
+
+            for post in publishing:
+                feed_id = feed_titles.get(post.title or "")
+                if feed_id:
+                    post.status = "published"
+                    post.xhs_feed_id = feed_id
+                    post.xhs_note_url = f"https://www.xiaohongshu.com/explore/{feed_id}"
+                    post.publish_time = dt.now(timezone.utc)
+                    logger.info("Passive sync: post %d '%s' → published, feed_id=%s", post.id, post.title, feed_id)
+                    updated += 1
+                else:
+                    logger.debug("Passive sync: post %d '%s' still not found in MCP feed list", post.id, post.title)
+
+        if updated:
+            db.commit()
+    except Exception as e:
+        logger.warning("Passive sync failed (MCP unreachable?): %s", e)
+
+    return {"updated": updated}

@@ -8,6 +8,7 @@
     <div class="tabs">
         <button @click="filter = ''" :class="'tab ' + (filter === '' ? 'on' : '')">全部</button>
         <button @click="filter = 'draft'" :class="'tab ' + (filter === 'draft' ? 'on' : '')">草稿</button>
+        <button @click="filter = 'publishing'" :class="'tab ' + (filter === 'publishing' ? 'on' : '')">发布中</button>
         <button @click="filter = 'published'" :class="'tab ' + (filter === 'published' ? 'on' : '')">已发布</button>
         <button @click="filter = 'failed'" :class="'tab ' + (filter === 'failed' ? 'on' : '')">失败</button>
     </div>
@@ -31,7 +32,7 @@
                 <div class="card-foot">
                     <a :href="'/posts/' + post.id" class="btn btn-outline btn-sm">查看编辑</a>
                     <button @click="deletePost(post.id)" class="btn btn-ghost btn-sm">删除</button>
-                    <button x-show="post.status === 'draft'" @click="publishPost(post.id)" class="btn btn-accent btn-sm">发布</button>
+                    <button x-show="post.status === 'draft' || post.status === 'failed'" @click="publishPost(post.id)" class="btn btn-accent btn-sm">发布</button>
                 </div>
             </div>
         </template>
@@ -74,12 +75,22 @@ document.addEventListener('alpine:init', () => {
             window.addEventListener('posts-deleted', function(e) {
                 self.posts = self.posts.filter(p => p.id !== e.detail);
             });
+            // Passive sync: cross-check any 'publishing' posts against MCP feed list
+            var publishing = this.posts.filter(function(p) { return p.status === 'publishing'; });
+            if (publishing.length > 0) {
+                fetch('/api/posts/sync-publishing', {method:'POST'}).then(function(r){return r.json();}).then(function(d) {
+                    if (d.updated > 0) {
+                        // Reload posts to get updated statuses
+                        fetch('/api/posts').then(function(r){return r.json();}).then(function(data){self.posts = data;});
+                    }
+                });
+            }
         },
         get filteredPosts() {
             return this.filter ? this.posts.filter(p => p.status === this.filter) : this.posts;
         },
         statusLabel(s) {
-            return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s;
+            return {draft:'草稿', publishing:'发布中', published:'已发布', failed:'发布失败'}[s] || s;
         },
         async deletePost(id) {
             window._deletePostId = id;
@@ -88,7 +99,7 @@ document.addEventListener('alpine:init', () => {
         async publishPost(id) {
             const r = await fetch(`/api/agent/${id}/publish`, {method: 'POST'});
             const d = await r.json();
-            if (d.success) { const p = this.posts.find(x => x.id === id); if (p) p.status = 'published'; postsFlash('发布成功'); }
+            if (d.success) { const p = this.posts.find(x => x.id === id); if (p) p.status = 'publishing'; postsFlash('⏳ 发布任务已提交'); }
             else postsFlash('发布失败: ' + (d.error || ''), true);
         },
     }));

@@ -4,16 +4,16 @@
 <h1>生成小红书文案</h1>
 <p class="sub">输入活动主题，AI Agent 自动生成去 AI 味、合规的小红书图文</p>
 
-<form x-data="generatorForm" @submit.prevent="startGenerate" class="card" style="padding:28px;">
+<form x-data="generatorForm" @submit.prevent="startGenerate" class="card" style="padding:28px;position:relative;" :style="loading ? 'opacity:.6;pointer-events:none;' : ''">
     <div class="field">
         <label>活动主题</label>
-        <textarea x-model="theme" class="textarea" placeholder="例如：小鹏 G9 春日出行体验分享…" rows="3" required></textarea>
+        <textarea x-model="theme" class="textarea" placeholder="例如：小鹏 G9 春日出行体验分享…" rows="3" required :disabled="loading"></textarea>
     </div>
 
     <div class="row">
         <div class="field">
             <label>AI Provider</label>
-            <select x-model="aiProvider" class="select" required>
+            <select x-model="aiProvider" class="select" required :disabled="loading">
                 <option value="">选择 AI…</option>
                 {% for c in configs %}
                 <option value="{{ c.provider }}" {% if c.is_active %}selected{% endif %}>{{ c.provider | upper }}</option>
@@ -25,8 +25,8 @@
         </div>
         <div class="field">
             <label>图片</label>
-            <div class="dropzone" @click="$refs.imgs.click()" @dragover.prevent @drop.prevent="handleDrop($event)">
-                <input type="file" x-ref="imgs" multiple accept="image/*" style="display:none" @change="handleImages">
+            <div class="dropzone" @click="!loading && $refs.imgs.click()" @dragover.prevent @drop.prevent="!loading && handleDrop($event)" :style="loading ? 'pointer-events:none;opacity:.5;' : ''">
+                <input type="file" x-ref="imgs" multiple accept="image/*" style="display:none" @change="handleImages" :disabled="loading">
                 <p style="color:var(--text-muted);font-size:.85rem;">点击或拖拽上传（JPG / PNG / WebP）</p>
             </div>
         </div>
@@ -44,14 +44,38 @@
     </button>
 </form>
 
-<div x-show="progress.length > 0" class="log" x-ref="log" style="margin-top:24px;">
-    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:12px;">Agent 实时进度：</p>
-    <template x-for="(p, i) in progress" :key="i">
-        <div class="log-line in">
-            <div :class="'log-dot ' + (p.status==='done'?'ok':p.status==='running'?'busy':'bad')"></div>
-            <div>
-                <span x-text="p.message" :style="p.status==='done'?'color:var(--success)':''"></span>
-                <span x-show="p.data?.flagged_count" style="color:var(--warn);font-size:.8rem;" x-text="'（' + p.data.flagged_count + '处 AI 痕迹）'"></span>
+<!-- Progress Steps -->
+<div x-show="loading" style="margin-top:28px;display:flex;flex-direction:column;gap:0;">
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px;">Agent 实时进度：</p>
+    <template x-for="(step, i) in steps" :key="step.key">
+        <div style="display:flex;align-items:flex-start;gap:14px;position:relative;padding-bottom:22px;">
+            <!-- Vertical connecting line -->
+            <div x-show="i < steps.length - 1"
+                style="position:absolute;left:10px;top:26px;width:2px;height:calc(100% - 18px);background:var(--border);border-radius:1px;"
+                :style="step.status === 'done' || step.status === 'skipped' ? 'background:var(--success);' : 'background:var(--border);'">
+            </div>
+            <!-- Step circle -->
+            <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;line-height:1;"
+                :style="{
+                    background: step.status === 'done' ? 'var(--success)' : step.status === 'running' ? 'var(--accent)' : step.status === 'error' ? 'var(--error)' : step.status === 'skipped' ? 'var(--border)' : 'transparent',
+                    border: step.status === 'pending' ? '2px solid var(--border)' : '2px solid transparent',
+                    color: (step.status === 'done' || step.status === 'running' || step.status === 'error') ? '#fff' : 'transparent',
+                    animation: step.status === 'running' ? 'pulse .9s ease-in-out infinite' : 'none',
+                }">
+                <span x-show="step.status === 'done'">✓</span>
+                <span x-show="step.status === 'running'" style="font-size:.5rem;">●</span>
+                <span x-show="step.status === 'error'">✗</span>
+                <span x-show="step.status === 'skipped'" style="color:var(--text-muted);">−</span>
+            </div>
+            <!-- Step label + message -->
+            <div style="flex:1;min-width:0;">
+                <span x-text="step.label"
+                    :style="{fontSize:'.85rem',fontWeight:step.status==='running'?'600':'400',color:step.status==='pending'?'var(--text-muted)':step.status==='error'?'var(--error)':'var(--text)'}">
+                </span>
+                <span x-show="step.message && step.status !== 'pending'"
+                    x-text="' · ' + step.message"
+                    style="font-size:.78rem;color:var(--text-muted);word-break:break-all;">
+                </span>
             </div>
         </div>
     </template>

@@ -1,85 +1,274 @@
 {% extends "base.html" %}
 {% block title %}文章详情 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
-<div x-data="postEditor" x-init="init({{ post | tojson | safe }})">
+<script id="post-json" type="application/json">{{ post | tojson | safe }}</script>
+
+<div x-data="postEditor" x-init="init()" style="position:relative;">
+    <!-- Lock overlay when publishing -->
+    <div x-show="post.status === 'publishing'" style="position:absolute;inset:0;z-index:10;background:rgba(250,249,247,.45);border-radius:var(--radius);cursor:not-allowed;display:flex;align-items:flex-start;justify-content:center;padding-top:80px;">
+        <span class="badge badge-publishing" style="font-size:.9rem;padding:8px 20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">⏳ 发布中，不可编辑…</span>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
         <div>
             <h1 style="margin-bottom:4px;">文章详情</h1>
-            <span :class="'badge badge-' + post.status" x-text="statusLabel(post.status)"></span>
+            <span class="badge badge-{{ post.status }}">{{ {'draft':'草稿','published':'已发布','failed':'发布失败'}.get(post.status, post.status) }}</span>
         </div>
         <div class="flex">
             <a href="/posts" class="btn btn-ghost btn-sm">← 返回</a>
-            <button @click="save" class="btn btn-outline btn-sm">保存</button>
-            <button @click="publish" x-show="post.status !== 'published'" class="btn btn-accent btn-sm">发布</button>
-            <button @click="regenerate" class="btn btn-ghost btn-sm">重新生成</button>
+            <button @click="save" x-show="!isLocked" class="btn btn-outline btn-sm">保存</button>
+            <button @click="doPublish" x-show="post.status === 'draft' || post.status === 'failed' || post.status === 'publishing'" class="btn btn-accent btn-sm">发布</button>
+            <button @click="regenerate" x-show="!isLocked" class="btn btn-ghost btn-sm">重新生成</button>
+            <span x-show="post.status === 'publishing'" class="badge badge-publishing" style="font-size:.78rem;padding:4px 10px;margin-left:4px;">⏳ 发布中…</span>
         </div>
     </div>
 
     <div class="row" style="margin-top:20px;">
         <div class="field">
-            <label>标题 <span style="color:var(--text-muted);font-weight:400;" x-text="'(' + (post.title?.length || 0) + '/20)'"></span></label>
-            <input type="text" x-model="post.title" class="input" maxlength="20">
+            <label>标题 <span style="color:var(--text-muted);font-weight:400;" x-text="titleCount"></span></label>
+            <input type="text" x-model="post.title" class="input" maxlength="60" @input="checkTitle" :disabled="isLocked">
+            <p x-show="titleErr" x-text="titleErr" style="color:var(--error);font-size:.78rem;margin-top:4px;"></p>
         </div>
         <div class="field">
             <label>标签</label>
-            <div class="flex">
+            <div class="flex" style="align-items:center;">
                 <template x-for="(tag, i) in post.tags" :key="i">
-                    <span class="tag">#<span x-text="tag"></span><span style="cursor:pointer;margin-left:3px;opacity:.5;" @click="removeTag(i)">×</span></span>
+                    <span class="tag" style="gap:6px;padding:5px 12px;">
+                        #<span x-text="tag"></span>
+                        <span @click="!isLocked && removeTag(i)" :style="'cursor:' + (isLocked ? 'default' : 'pointer') + ';opacity:' + (isLocked ? '.2' : '.5') + ';font-size:.7rem;line-height:1;'" title="移除">✕</span>
+                    </span>
                 </template>
-                <input type="text" placeholder="+ 标签" @keydown.enter.prevent="addTag($event)" style="border:none;background:transparent;font-size:.82rem;width:80px;outline:none;color:var(--text-muted);">
+                <span class="tag" style="border:1.5px dashed var(--border);background:transparent;color:var(--text-muted);cursor:pointer;gap:4px;padding:5px 12px;" @click="$refs.tagInput.focus()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.5;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <input type="text" x-ref="tagInput" placeholder="添加" @keydown.enter.prevent="addTag($event)" @focus="$el.parentElement.style.borderColor='var(--accent)';$el.parentElement.style.color='var(--text)'" @blur="$el.parentElement.style.borderColor='var(--border)';$el.parentElement.style.color='var(--text-muted)'" style="border:none;background:transparent;font-size:.82rem;width:48px;outline:none;color:inherit;font-family:inherit;padding:0;" :disabled="isLocked">
+                </span>
             </div>
         </div>
     </div>
 
     <div class="field">
         <label>正文</label>
-        <textarea x-model="post.content" class="textarea" rows="14"></textarea>
+        <textarea x-model="post.content" class="textarea" rows="14" @input="checkContent" :disabled="isLocked"></textarea>
+        <p x-show="contentErr" x-text="contentErr" style="color:var(--error);font-size:.78rem;margin-top:4px;"></p>
     </div>
 
     <div class="field">
-        <label>图片</label>
-        <div class="thumbs">
+        <label>图片 <span style="font-weight:400;color:var(--text-muted);">（小红书至少需要 1 张）</span></label>
+        <div class="thumbs" style="margin-bottom:10px;">
             <template x-for="(img, i) in post.images" :key="i">
-                <div style="position:relative;">
-                    <img :src="img" class="thumb" style="width:120px;height:120px;">
-                    <button @click="removeImage(i)" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:var(--error);color:#fff;border:none;cursor:pointer;font-size:.65rem;line-height:20px;text-align:center;">×</button>
+                <div style="position:relative;cursor:pointer;" @click="previewImage(img)">
+                    <img :src="img" class="thumb" style="width:100px;height:100px;">
+                    <button @click.stop="!isLocked && removeImage(i)" :disabled="isLocked" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:var(--error);color:#fff;border:none;font-size:.65rem;line-height:20px;text-align:center;" :style="isLocked ? 'opacity:.3;cursor:default;' : 'cursor:pointer;'">×</button>
                 </div>
             </template>
         </div>
+        <button type="button" @click="!uploading && !isLocked && $refs.imgInput.click()" :disabled="uploading || isLocked"
+            class="btn btn-ghost btn-sm" style="gap:6px;font-weight:400;"
+            :style="(uploading || isLocked) ? 'opacity:.5;' : ''">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>添加图片</span>
+        </button>
+            <input type="file" x-ref="imgInput" multiple accept="image/*" style="display:none" @change="uploadImages">
+        </div>
+        <p x-show="imagesErr" x-text="imagesErr" style="color:var(--error);font-size:.78rem;"></p>
     </div>
 
-    <p style="font-size:.8rem;color:var(--text-muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
-        <span x-show="post.theme">主题：<span x-text="post.theme" style="color:var(--text-secondary);"></span> · </span>
-        <span x-show="post.ai_provider">AI：<span x-text="post.ai_provider" style="color:var(--text-secondary);"></span> · </span>
-        <span x-text="'创建于 ' + new Date(post.created_at).toLocaleString('zh-CN')"></span>
-        <span x-show="post.xhs_feed_id"> · FeedID：<code x-text="post.xhs_feed_id"></code></span>
-    </p>
+    <div style="font-size:.8rem;color:var(--text-muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px 16px;">
+        {% if post.theme %}<span>主题：<b style="color:var(--text-secondary);font-weight:500;">{{ post.theme }}</b></span>{% endif %}
+        {% if post.ai_provider %}<span>AI 模型：<b style="color:var(--text-secondary);font-weight:500;">{{ post.ai_provider }}</b></span>{% endif %}
+        <span>创建于 <b style="color:var(--text-secondary);font-weight:500;">{{ (post.created_at or '')[:19] }}</b></span>
+        {% if post.xhs_feed_id %}<span>FeedID：<code>{{ post.xhs_feed_id }}</code></span>{% endif %}
+        {% if post.xhs_note_url %}<span><a href="{{ post.xhs_note_url }}" target="_blank" style="color:var(--accent);">🔗 打开笔记</a></span>{% endif %}
+    </div>
+
+    {% if not post.content and not post.title %}
+    <div style="margin-top:16px;padding:12px 16px;background:var(--warn);border-radius:var(--radius-sm);font-size:.84rem;text-align:center;">
+        ⚠️ 内容为空 — 可能是 AI 生成过程中出现了问题，请尝试<a href="/" style="color:var(--accent);">重新生成</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Image Preview Lightbox -->
+<div id="img-preview-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;"
+     onclick="closeImgPreview()">
+    <img id="img-preview-img" src="" style="max-width:92vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 40px rgba(0,0,0,.3);">
 </div>
 
 <script>
+/* ==================== Title length (matches MCP xhsutil.CalcTitleLength) ==================== */
+function calcTitleLength(s) {
+    var byteLen = 0;
+    for (var i = 0; i < s.length; i++) {
+        byteLen += s.charCodeAt(i) > 127 ? 2 : 1;
+    }
+    return Math.floor((byteLen + 1) / 2);
+}
+
+/* ==================== Image Preview ==================== */
+function previewImage(url) {
+    document.getElementById('img-preview-img').src = url;
+    document.getElementById('img-preview-modal').style.display = 'flex';
+    document.addEventListener('keydown', onImgEsc);
+}
+function closeImgPreview() {
+    document.getElementById('img-preview-modal').style.display = 'none';
+    document.removeEventListener('keydown', onImgEsc);
+}
+function onImgEsc(e) { if (e.key === 'Escape') closeImgPreview(); }
+
+/* ==================== Alpine ==================== */
 document.addEventListener('alpine:init', () => {
+    // Read post data from embedded JSON before component is created
+    var postEl = document.getElementById('post-json');
+    var postData = {};
+    try { if (postEl) postData = JSON.parse(postEl.textContent); } catch(e) {}
+
     Alpine.data('postEditor', () => ({
-        post: {},
-        init(data) { this.post = {...data}; },
-        statusLabel(s) { return {draft:'草稿', published:'已发布', failed:'发布失败'}[s] || s; },
-        async save() {
-            await fetch(`/api/posts/${this.post.id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:this.post.title,content:this.post.content,tags:this.post.tags})});
-            flash('已保存');
+        post: postData,
+        uploading: false,
+        titleErr: '',
+        contentErr: '',
+        imagesErr: '',
+
+        init() {
+            this.checkTitle();
         },
-        async publish() {
-            const r = await fetch(`/api/agent/${this.post.id}/publish`,{method:'POST'});const d=await r.json();
-            if(d.success){this.post.status='published';flash('发布成功');}else flash('发布失败: '+(d.error||''),true);
+
+        get titleCount() {
+            var len = calcTitleLength(this.post.title || '');
+            return '(' + len + '/20)';
         },
-        async regenerate() { window.location.href = `/generate/${this.post.id}`; },
-        addTag(e) { const t = e.target.value.trim(); if (t && !this.post.tags.includes(t)) this.post.tags.push(t); e.target.value = ''; },
-        removeTag(i) { this.post.tags.splice(i,1); },
+
+        checkTitle() {
+            var t = (this.post.title || '').trim();
+            if (!t) { this.titleErr = '标题不能为空'; return; }
+            var len = calcTitleLength(t);
+            if (len > 20) { this.titleErr = '标题超长（小红书限制 20 个字/英文词），当前' + len; return; }
+            this.titleErr = '';
+        },
+
+        checkContent() {
+            var c = (this.post.content || '').trim();
+            if (!c) { this.contentErr = '正文不能为空'; return; }
+            this.contentErr = '';
+        },
+
+        /* ── Images ─────────────────────────── */
+        async uploadImages(e) {
+            var files = e.target.files;
+            if (!files.length) return;
+            this.uploading = true;
+            var fd = new FormData();
+            for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
+            try {
+                var r = await fetch('/api/upload', {method:'POST', body:fd});
+                var d = await r.json();
+                if (d.urls) this.post.images = (this.post.images || []).concat(d.urls);
+                this.imagesErr = '';
+            } catch(ex) {
+                flash('图片上传失败: ' + ex.message, true);
+            }
+            this.uploading = false;
+            e.target.value = '';
+        },
+
+        previewImage(url) { previewImage(url); },
+
         removeImage(i) { this.post.images.splice(i,1); },
+
+        /* ── Tags ──────────────────────────── */
+        addTag(e) {
+            var t = e.target.value.trim();
+            if (t && !this.post.tags.includes(t)) this.post.tags.push(t);
+            e.target.value = '';
+        },
+        removeTag(i) { this.post.tags.splice(i,1); },
+
+        /* ── Save ──────────────────────────── */
+        async save() {
+            var r = await fetch('/api/posts/' + this.post.id, {
+                method:'PUT', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({title:this.post.title, content:this.post.content, tags:this.post.tags, images:this.post.images}),
+            });
+            if (r.ok) flash('已保存');
+            else flash('保存失败', true);
+        },
+
+        /* ── Publish (with MCP-matching validation) ── */
+        get isLocked() { return this.post.status === 'publishing' || this.post.status === 'published'; },
+
+        async doPublish() {
+            if (this.post.status === 'published') return;
+            // Validate against MCP PublishRequest constraints
+            this.checkTitle();
+            this.checkContent();
+            if (!(this.post.images || []).length) {
+                this.imagesErr = '小红书发布至少需要 1 张图片，请先上传';
+            } else {
+                this.imagesErr = '';
+            }
+            if (this.titleErr || this.contentErr || this.imagesErr) {
+                flash('请先修正上方标注的问题再发布', true);
+                return;
+            }
+
+            try {
+                // Save first so MCP sees latest edits
+                await fetch('/api/posts/' + this.post.id, {
+                    method:'PUT', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({title:this.post.title, content:this.post.content, tags:this.post.tags, images:this.post.images}),
+                });
+                // Trigger async publish (returns immediately)
+                var r = await fetch('/api/agent/' + this.post.id + '/publish', {method:'POST'});
+                var d = await r.json();
+                if (d.success) {
+                    this.post.status = 'publishing';
+                    flash('⏳ 发布任务已提交，请稍候…');
+                    this._pollStatus();
+                } else {
+                    flash('❌ ' + (d.error || '发布失败'), true);
+                }
+            } catch(ex) {
+                flash('❌ 网络错误: ' + ex.message, true);
+            }
+        },
+
+        _pollStatus() {
+            var self = this;
+            var attempts = 0;
+            var maxAttempts = 40; // ~2 minutes at 3s intervals
+            var timer = setInterval(async function() {
+                attempts++;
+                if (attempts > maxAttempts || self.post.status !== 'publishing') {
+                    clearInterval(timer);
+                    return;
+                }
+                try {
+                    var r = await fetch('/api/posts/' + self.post.id);
+                    var p = await r.json();
+                    if (p.status === 'published') {
+                        self.post.status = 'published';
+                        flash('✅ 发布成功！');
+                        clearInterval(timer);
+                    } else if (p.status === 'failed') {
+                        self.post.status = 'failed';
+                        flash('❌ 发布失败，可修改后重试', true);
+                        clearInterval(timer);
+                    }
+                } catch(e) { /* keep polling */ }
+            }, 3000);
+        },
+
+        statusLabel(s) { return {draft:'草稿', publishing:'发布中', published:'已发布', failed:'发布失败'}[s] || s; },
+
+        async regenerate() { window.location.href = '/generate/' + this.post.id; },
     }));
 });
+
 function flash(msg, isError) {
-    var e=document.createElement('div');e.textContent=msg;
-    e.style.cssText='position:fixed;top:20px;right:20px;background:'+(isError?'var(--color-error)':'var(--color-success)')+';color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out';
-    document.body.appendChild(e);setTimeout(function(){e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(function(){e.remove()},300)},2000);
+    var e = document.createElement('div'); e.textContent = msg;
+    e.style.cssText = 'position:fixed;top:20px;right:20px;max-width:380px;background:'+(isError?'var(--color-error)':'var(--color-success)')+';color:#fff;padding:10px 20px;border-radius:12px;font-size:.85rem;z-index:999;animation:up .3s ease-out;word-break:break-all;';
+    document.body.appendChild(e);
+    setTimeout(function(){e.style.opacity='0';e.style.transition='opacity .3s';setTimeout(function(){e.remove()},300)},2500);
 }
 </script>
 {% endblock %}

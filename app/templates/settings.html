@@ -51,12 +51,42 @@
     <h2>小红书账号</h2>
     <p class="sub">管理 MCP 连接和登录状态</p>
     <div x-data="xhsStatus" x-init="checkStatus" class="card">
+        <!-- Status row -->
         <div class="flex">
             <p x-show="loading" style="color:var(--text-muted);">检查中…</p>
             <span x-show="!loading && status?.is_logged_in" class="badge badge-published" style="font-size:.88rem;">已登录</span>
             <span x-show="!loading && status && !status.is_logged_in" class="badge badge-failed" style="font-size:.88rem;">未登录</span>
-            <span x-show="status?.username" style="color:var(--text-secondary);" x-text="status.username"></span>
         </div>
+
+        <!-- Account info card: shows after login detected, with loading skeleton -->
+        <div x-show="status?.is_logged_in" style="margin-top:14px;padding:14px;background:var(--bg-hover);border-radius:var(--radius-sm);font-size:.84rem;">
+            <!-- Loading skeleton -->
+            <div x-show="loadingProfile" style="display:flex;align-items:center;gap:10px;">
+                <div style="width:40px;height:40px;border-radius:50%;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
+                <div style="flex:1;">
+                    <div style="width:80px;height:14px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;margin-bottom:6px;"></div>
+                    <div style="width:120px;height:10px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
+                </div>
+            </div>
+            <!-- Profile loaded -->
+            <div x-show="!loadingProfile && profile" style="display:flex;align-items:center;gap:10px;">
+                <img x-show="profile?.userBasicInfo?.images" :src="profile?.userBasicInfo?.images" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--border);">
+                <div>
+                    <p style="font-weight:600;" x-text="profile?.userBasicInfo?.nickname || '(未知)'"></p>
+                    <p style="color:var(--text-muted);font-size:.78rem;">小红书号：<span x-text="profile?.userBasicInfo?.redId || '-'"></span></p>
+                    <p x-show="profile?.userBasicInfo?.desc" style="color:var(--text-secondary);font-size:.78rem;margin-top:2px;" x-text="profile?.userBasicInfo?.desc"></p>
+                </div>
+            </div>
+            <!-- Profile failed -->
+            <p x-show="!loadingProfile && !profile" style="color:var(--text-muted);">未能加载帐号信息</p>
+        </div>
+
+        <!-- My notes count -->
+        <p x-show="profile?.feeds" style="font-size:.82rem;color:var(--text-secondary);margin-top:8px;">
+            📒 我的笔记：<span x-text="profile?.feeds?.length || 0"></span> 篇
+        </p>
+
+        <!-- Buttons -->
         <div class="flex mt-4">
             <button @click="checkStatus" class="btn btn-outline btn-sm">刷新状态</button>
             <button @click="showQRModal()" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
@@ -228,7 +258,10 @@ function closeQRModal() {
     if (qrTimer) clearInterval(qrTimer);
     document.removeEventListener('keydown', onQrEsc);
     document.getElementById('qr-modal').style.display = 'none';
-    window.dispatchEvent(new CustomEvent('xhs-refresh'));
+    // 扫码后 MCP 可能还没完成 session 建立，延迟 2s + 带上轮询标记
+    setTimeout(function() {
+        window.dispatchEvent(new CustomEvent('xhs-refresh', {detail: {poll: true}}));
+    }, 2000);
 }
 
 /* ==================== Delete Modal ==================== */
@@ -272,6 +305,7 @@ function closeLogoutModal() {
 async function confirmLogout() {
     closeLogoutModal();
     await fetch('/api/xhs/logout', {method: 'DELETE'});
+    try { localStorage.removeItem('xhs_login_cache'); } catch(e) {}
     window.dispatchEvent(new CustomEvent('xhs-refresh'));
 }
 
@@ -298,10 +332,56 @@ document.addEventListener('alpine:init', function() {
     });
 
     Alpine.data('xhsStatus', function() {
+        var CACHE_KEY = 'xhs_login_cache';
+        var CACHE_TTL = 30 * 60 * 1000; // 30 min
+        function readCache() {
+            try { var d=JSON.parse(localStorage.getItem(CACHE_KEY)); if(d&&d.ts&&(Date.now()-d.ts<CACHE_TTL)) return d; } catch(e) {}
+            return null;
+        }
+        function writeCache(data) {
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(),status:data.status||data,profile:data.profile||null})); } catch(e) {}
+        }
+        function clearCache() { try { localStorage.removeItem(CACHE_KEY); } catch(e) {} }
+
         return {
-            status:null,loading:false,
-            init: function(){var c=this;c.checkStatus();window.addEventListener('xhs-refresh',function(){c.checkStatus();});},
-            checkStatus: async function(){this.loading=true;try{var r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
+            status:{},loading:false,profile:null,loadingProfile:false,
+            init: function(){
+                var c=this;
+                // Restore from cache for instant display — no loading flash
+                var cached = readCache();
+                if (cached) { this.status = cached.status || {}; this.profile = cached.profile; }
+                // Always refresh in background to catch expiry
+                c.checkStatus(false, !!cached);
+                window.addEventListener('xhs-refresh',function(e){var poll=e.detail&&e.detail.poll;c.checkStatus(poll);});
+            },
+            checkStatus: async function(poll, silent){
+                if (!silent) this.loading = true;
+                var maxRetries = poll ? 3 : 1;
+                var delay = 1500;
+                var result = {is_logged_in: false};
+                for (var i = 0; i < maxRetries; i++) {
+                    try { var r = await fetch('/api/xhs/status'); result = await r.json(); } catch(e) {}
+                    if (result && result.is_logged_in) break;
+                    if (i < maxRetries - 1) await new Promise(function(resolve){setTimeout(resolve,delay);});
+                }
+                var wasLoggedIn = this.status && this.status.is_logged_in;
+                this.status = result;
+                if (result && result.is_logged_in) {
+                    if (!wasLoggedIn || !this.profile) await this.fetchProfile();
+                    // Only write cache after profile is ready (fetchProfile handles its own write)
+                    if (this.profile) writeCache({status: result, profile: this.profile});
+                    else writeCache({status: result, profile: null});
+                } else {
+                    clearCache();
+                    this.profile = null;
+                }
+                this.loading = false;
+            },
+            fetchProfile: async function(){
+                this.loadingProfile = true;
+                try { var r = await fetch('/api/xhs/me'); this.profile = await r.json(); writeCache({status:this.status,profile:this.profile}); } catch(e) { this.profile = null; }
+                this.loadingProfile = false;
+            },
         };
     });
 });

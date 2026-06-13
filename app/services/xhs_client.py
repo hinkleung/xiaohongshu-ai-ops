@@ -126,3 +126,13 @@ class XHSClient:
             "keyword": keyword,
             "filters": filters or {},
         })
+
+    # ── User / Feeds ────────────────────────────────────
+
+    async def get_my_profile(self) -> dict:
+        """GET /api/v1/user/me → user profile info"""
+        return await self._get("/api/v1/user/me")
+
+    async def list_my_feeds(self) -> dict:
+        """GET /api/v1/feeds/list → my note/feed list"""
+        return await self._get("/api/v1/feeds/list")

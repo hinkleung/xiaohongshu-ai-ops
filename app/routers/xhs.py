@@ -49,3 +49,32 @@ async def get_feed_detail(feed_id: str, xsec_token: str = ""):
     except Exception as e:
         logger.error("MCP feed detail failed feed=%s: %s", feed_id, e)
         raise HTTPException(503, f"MCP server unreachable: {e}")
+
+
+@router.get("/me")
+async def get_my_profile():
+    """Proxy MCP GET /api/v1/user/me → real account info (nickname, redId, feeds)."""
+    try:
+        async with XHSClient(base_url=XHS_MCP_URL) as client:
+            result = await client.get_my_profile()
+            # MCP wraps this endpoint's response with an extra "data" key
+            if isinstance(result, dict) and "data" in result:
+                result = result["data"]
+            logger.info("Fetched my profile")
+            return result
+    except Exception as e:
+        logger.error("MCP my profile failed: %s", e)
+        raise HTTPException(503, f"MCP server unreachable: {e}")
+
+
+@router.get("/my-feeds")
+async def list_my_feeds():
+    """Proxy MCP GET /api/v1/feeds/list → my note list."""
+    try:
+        async with XHSClient(base_url=XHS_MCP_URL) as client:
+            result = await client.list_my_feeds()
+            logger.info("Fetched my feeds list")
+            return result
+    except Exception as e:
+        logger.error("MCP feeds list failed: %s", e)
+        raise HTTPException(503, f"MCP server unreachable: {e}")

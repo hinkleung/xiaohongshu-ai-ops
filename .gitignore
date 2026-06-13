@@ -6,3 +6,4 @@ data/
 .venv/
 .superpowers/
 mcp-data/
+.mcp-reference/

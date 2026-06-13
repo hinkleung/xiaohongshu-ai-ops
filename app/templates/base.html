@@ -208,6 +208,13 @@
             .nav-link { padding: 5px 12px; font-size: .82rem; }
             .row { grid-template-columns: 1fr; }
             .card { padding: 18px; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; animation: fadi 180ms ease-out; }
+        @keyframes fadi { from { opacity: 0 } }
+        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px 32px; max-width: 360px; width: 90%; text-align: center; box-shadow: var(--shadow-lg); animation: up 250ms var(--ease); }
+        .modal h3 { margin-bottom: 16px; }
+        .modal img { max-width: 240px; margin: 0 auto 20px; border-radius: var(--radius); }
         }
     </style>
 </head>

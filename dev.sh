@@ -31,5 +31,5 @@ else
 fi
 
 # 启动本地后端（热重载模式）
-echo "✅ 启动本地后端 (localhost:8000)…"
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+echo "✅ 启动本地后端 (localhost:8080)…"
+exec uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload

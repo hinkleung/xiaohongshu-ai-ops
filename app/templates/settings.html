@@ -59,18 +59,23 @@
         </div>
         <div class="flex mt-4">
             <button @click="checkStatus" class="btn btn-outline btn-sm">刷新状态</button>
-            <button @click="getQRCode" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">获取登录码</button>
+            <button @click="getQRCode" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
         </div>
     </div>
 
-    <!-- QR Code Modal -->
-    <div x-show="showModal" class="modal-overlay" @click.self="closeModal">
+    <div x-show="showModal" class="modal-overlay">
         <div class="modal">
             <h3>扫码登录小红书</h3>
-            <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:16px;">打开小红书 App 扫描二维码</p>
-            <img :src="qrcode" alt="登录二维码">
-            <div class="flex" style="justify-content:center;">
-                <button @click="closeModal" class="btn btn-accent">完成登录，刷新状态</button>
+            <p x-show="qrLoading" style="color:var(--text-muted);padding:32px 0;">正在获取登录二维码…</p>
+            <template x-if="!qrLoading && qrcode">
+                <div>
+                    <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:16px;">打开小红书 App 扫描二维码</p>
+                    <img :src="qrcode" alt="登录二维码">
+                    <p x-show="qrcodeExpire" style="font-size:.75rem;color:var(--text-muted);margin-top:8px;">二维码有效期：<span x-text="qrcodeExpire"></span></p>
+                </div>
+            </template>
+            <div class="flex mt-4" style="justify-content:center;" x-show="!qrLoading">
+                <button @click="closeModal" class="btn btn-accent">完成扫码，刷新状态</button>
             </div>
         </div>
     </div>
@@ -104,10 +109,14 @@ document.addEventListener('alpine:init', () => {
         async remove(id){if(!confirm('确认删除？'))return;await fetch(`/api/configs/ai/${id}`,{method:'DELETE'});this.configs=this.configs.filter(c=>c.id!==id);},
     }));
     Alpine.data('xhsStatus', () => ({
-        status:null,loading:false,qrcode:null,showModal:false,
+        status:null,loading:false,qrcode:null,qrcodeExpire:'',qrLoading:false,showModal:false,
         async checkStatus(){this.loading=true;try{const r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
-        async getQRCode(){const r=await fetch('/api/xhs/login',{method:'POST'});const d=await r.json();this.qrcode=d.img;this.showModal=true;},
-        async closeModal(){this.showModal=false;this.qrcode=null;await this.checkStatus();},
+        async getQRCode(){
+            this.showModal=true;this.qrLoading=true;this.qrcode=null;
+            try{const r=await fetch('/api/xhs/login',{method:'POST'});const d=await r.json();this.qrcode=d.img;this.qrcodeExpire=d.timeout||'';}catch(e){}
+            this.qrLoading=false;
+        },
+        async closeModal(){this.showModal=false;this.qrcode=null;this.qrLoading=false;await this.checkStatus();},
     }));
 });
 </script>

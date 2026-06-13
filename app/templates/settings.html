@@ -60,6 +60,7 @@
         <div class="flex mt-4">
             <button @click="checkStatus" class="btn btn-outline btn-sm">刷新状态</button>
             <button @click="showQRModal()" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
+            <button @click="doLogout()" x-show="status?.is_logged_in" class="btn btn-ghost btn-sm" style="color:var(--color-error);">退出登录</button>
         </div>
     </div>
 </div>
@@ -140,6 +141,7 @@ document.addEventListener('alpine:init', () => {
         status:null,loading:false,
         init(){this.checkStatus();window.addEventListener('xhs-refresh',()=>this.checkStatus());},
         async checkStatus(){this.loading=true;try{const r=await fetch('/api/xhs/status');this.status=await r.json();}catch(e){this.status={is_logged_in:false}}this.loading=false;},
+        async doLogout(){if(!confirm('确认退出登录？'))return;await fetch('/api/xhs/logout',{method:'DELETE'});await this.checkStatus();},
     }));
 });
 </script>

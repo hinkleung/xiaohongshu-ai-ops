@@ -30,6 +30,17 @@ async def trigger_login():
         raise HTTPException(503, f"MCP server unreachable: {e}")
 
 
+@router.delete("/logout")
+async def logout():
+    try:
+        async with XHSClient(base_url=XHS_MCP_URL) as client:
+            logger.info("Logout requested")
+            return await client.logout()
+    except Exception as e:
+        logger.error("MCP logout failed: %s", e)
+        raise HTTPException(503, f"MCP server unreachable: {e}")
+
+
 @router.get("/feeds/{feed_id}")
 async def get_feed_detail(feed_id: str, xsec_token: str = ""):
     try:

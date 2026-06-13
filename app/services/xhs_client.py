@@ -63,6 +63,15 @@ class XHSClient:
             return body["data"]
         return body
 
+    async def _delete(self, path: str) -> dict:
+        logger.debug("MCP DELETE %s", path)
+        resp = await self._client.delete(self._url(path))
+        resp.raise_for_status()
+        body = resp.json()
+        if isinstance(body, dict) and body.get("success"):
+            return body["data"]
+        return body
+
     # ── Login ──────────────────────────────────────────
 
     async def check_login_status(self) -> dict:
@@ -72,6 +81,10 @@ class XHSClient:
     async def get_login_qrcode(self) -> dict:
         """GET /api/v1/login/qrcode → {timeout, is_logged_in, qrcode_base64}"""
         return await self._get("/api/v1/login/qrcode")
+
+    async def logout(self) -> dict:
+        """DELETE /api/v1/login/cookies → delete cookies, reset login state"""
+        return await self._delete("/api/v1/login/cookies")
 
     # ── Publish ────────────────────────────────────────
 

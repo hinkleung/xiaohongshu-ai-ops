@@ -77,8 +77,9 @@
             </div>
             <p id="qr-expire" style="text-align:center;font-size:.78rem;color:var(--color-text-secondary);margin-top:12px;display:none;"></p>
         </div>
-        <div style="margin-top:20px;">
-            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:180px;justify-content:center;text-align:center;">完成</button>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
+            <button onclick="refreshQRCode()" id="qr-refresh-btn" class="btn btn-outline btn-sm">刷新二维码</button>
+            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:120px;justify-content:center;text-align:center;">完成</button>
         </div>
     </div>
 </div>
@@ -175,6 +176,51 @@ async function showQRModal() {
         }
     } catch(e) {
         loading.textContent = '获取失败，请重试';
+    }
+}
+
+async function refreshQRCode() {
+    var loading = document.getElementById('qr-loading');
+    var content = document.getElementById('qr-content');
+    var img = document.getElementById('qr-image');
+    var expire = document.getElementById('qr-expire');
+    var btn = document.getElementById('qr-refresh-btn');
+    if (qrTimer) clearInterval(qrTimer);
+    img.style.opacity = '1';
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    expire.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = '刷新中…';
+    try {
+        var r = await fetch('/api/xhs/login', {method:'POST'});
+        var d = await r.json();
+        img.src = d.img;
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '刷新二维码';
+        if (d.timeout) {
+            var sec = parseTimeout(d.timeout);
+            if (sec > 0) {
+                expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
+                expire.style.display = 'block';
+                qrTimer = setInterval(function() {
+                    sec--;
+                    if (sec <= 0) {
+                        clearInterval(qrTimer);
+                        expire.textContent = '二维码已过期，请重新获取';
+                        img.style.opacity = '0.3';
+                    } else {
+                        expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
+                    }
+                }, 1000);
+            }
+        }
+    } catch(e) {
+        loading.textContent = '获取失败，请重试';
+        btn.disabled = false;
+        btn.textContent = '刷新二维码';
     }
 }
 

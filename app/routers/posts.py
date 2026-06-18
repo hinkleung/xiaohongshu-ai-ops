@@ -14,8 +14,10 @@ def _post_to_response(p: Post) -> PostResponse:
         id=p.id, title=p.title, content=p.content,
         tags=p.get_tags(), images=p.get_images(),
         status=p.status, xhs_feed_id=p.xhs_feed_id,
-        xhs_note_url=p.xhs_note_url, theme=p.theme,
-        ai_provider=p.ai_provider, publish_time=p.publish_time,
+        xhs_note_url=p.xhs_note_url, error_message=p.error_message,
+        activity_description=p.activity_description,
+        theme=p.theme, ai_provider=p.ai_provider,
+        publish_time=p.publish_time,
         created_at=p.created_at, updated_at=p.updated_at,
     )
 
@@ -58,7 +60,7 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db)):
     post = db.query(Post).get(post_id)
     if not post:
         raise HTTPException(404, "Post not found")
-    for field in ("title", "content", "theme"):
+    for field in ("title", "content", "theme", "activity_description"):
         val = getattr(data, field, None)
         if val is not None:
             setattr(post, field, val)
@@ -86,8 +88,9 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
 async def sync_publishing_status(db: Session = Depends(get_db)):
     """Cross-check all 'publishing' posts against MCP feed list.
     Called passively when the user opens the posts list page."""
-    publishing = db.query(Post).filter(Post.status == "publishing").all()
-    if not publishing:
+    # Include both 'publishing' and 'failed' posts — failed may have been false negatives
+    candidates = db.query(Post).filter(Post.status.in_(["publishing", "failed"])).all()
+    if not candidates:
         return {"updated": 0}
 
     from app.services.xhs_client import XHSClient
@@ -107,7 +110,7 @@ async def sync_publishing_status(db: Session = Depends(get_db)):
                 if t:
                     feed_titles[t] = f.get("id")
 
-            for post in publishing:
+            for post in candidates:
                 feed_id = feed_titles.get(post.title or "")
                 if feed_id:
                     post.status = "published"

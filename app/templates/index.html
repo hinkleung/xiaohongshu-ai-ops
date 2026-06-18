@@ -1,98 +1,103 @@
 {% extends "base.html" %}
 {% block title %}首页 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
+<script id="page-data" type="application/json"><< {"configs": configs} | tojson | safe >></script>
+
 <h1>生成小红书文案</h1>
 <p class="sub">输入活动主题，AI Agent 自动生成去 AI 味、合规的小红书图文</p>
 
-<form x-data="generatorForm" @submit.prevent="startGenerate" class="card" style="padding:28px;position:relative;" :style="loading ? 'opacity:.6;pointer-events:none;' : ''">
-    <div class="field">
-        <label>活动主题</label>
-        <textarea x-model="theme" class="textarea" placeholder="例如：小鹏 G9 春日出行体验分享…" rows="3" required :disabled="loading"></textarea>
-    </div>
-
-    <div class="row">
+<div id="app" v-cloak>
+    <form @submit.prevent="startGenerate" class="card" style="padding:28px;position:relative;" :style="loading ? 'opacity:.6;pointer-events:none;' : ''">
         <div class="field">
-            <label>AI Provider</label>
-            <select x-model="aiProvider" class="select" required :disabled="loading">
-                <option value="">选择 AI…</option>
-                {% for c in configs %}
-                <option value="{{ c.provider }}" {% if c.is_active %}selected{% endif %}>{{ c.provider | upper }}</option>
-                {% endfor %}
-            </select>
-            {% if not configs %}
-            <p class="hint">⚠️ 尚未配置 AI，请先前往 <a href="/settings" style="color:var(--accent);">设置</a></p>
-            {% endif %}
+            <label>活动说明 <span style="font-weight:400;color:var(--text-muted);">（官方活动原文）</span></label>
+            <textarea v-model="activityDesc" class="textarea" placeholder="粘贴官方活动说明或任务要求…" rows="3" :disabled="loading"></textarea>
+            <label style="margin-top:12px;">主题 <span style="font-weight:400;color:var(--text-muted);">（AI 会自动提炼 10 字以内标题）</span></label>
+            <input v-model="theme" class="input" placeholder="可选，留空由 AI 自动总结" :disabled="loading">
         </div>
-        <div class="field">
-            <label>图片</label>
-            <div class="dropzone" @click="!loading && $refs.imgs.click()" @dragover.prevent @drop.prevent="!loading && handleDrop($event)" :style="loading ? 'pointer-events:none;opacity:.5;' : ''">
-                <input type="file" x-ref="imgs" multiple accept="image/*" style="display:none" @change="handleImages" :disabled="loading">
-                <p style="color:var(--text-muted);font-size:.85rem;">点击或拖拽上传（JPG / PNG / WebP）</p>
+        <div class="row">
+            <div class="field">
+                <label>AI Provider</label>
+                <select v-model="aiProvider" class="select" required :disabled="loading">
+                    <option value="">选择 AI…</option>
+                    <option v-for="c in configs" :key="c.id" :value="c.provider">{{ c.provider.toUpperCase() }}</option>
+                </select>
+                <p v-if="!loading && configsFetched && configs.length === 0" class="hint">⚠️ 尚未配置 AI，请先前往 <a href="/settings" style="color:var(--accent);">设置</a></p>
+            </div>
+            <div class="field">
+                <label>图片</label>
+                <div class="dropzone" @click="!loading && $refs.imgs.click()" @dragover.prevent @drop.prevent="!loading && handleDrop($event)" :style="loading ? 'pointer-events:none;opacity:.5;' : ''">
+                    <input type="file" ref="imgs" multiple accept="image/*" style="display:none" @change="handleImages" :disabled="loading">
+                    <p style="color:var(--text-muted);font-size:.85rem;">点击或拖拽上传（JPG / PNG / WebP）</p>
+                </div>
             </div>
         </div>
-    </div>
+        <div v-show="previews.length > 0" class="thumbs">
+            <img v-for="(url, i) in previews" :key="i" :src="url" class="thumb">
+        </div>
+        <button type="submit" :disabled="loading"
+            style="width:100%;margin-top:12px;padding:14px 24px;font-size:1rem;font-weight:600;text-align:center;background:#ff5a1f;color:#fff;border:none;border-radius:24px;cursor:pointer;">
+            开始生成
+        </button>
+    </form>
 
-    <div x-show="previews.length > 0" class="thumbs">
-        <template x-for="(url, i) in previews" :key="i">
-            <img :src="url" class="thumb">
-        </template>
-    </div>
-
-    <button type="submit" :disabled="loading"
-        style="width:100%;margin-top:12px;padding:14px 24px;font-size:1rem;font-weight:600;text-align:center;background:#ff5a1f;color:#fff;border:none;border-radius:24px;cursor:pointer;">
-        开始生成
-    </button>
-</form>
-
-<!-- Progress Steps -->
-<div x-show="loading" style="margin-top:28px;display:flex;flex-direction:column;gap:0;">
-    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px;">Agent 实时进度：</p>
-    <template x-for="(step, i) in steps" :key="step.key">
-        <div style="display:flex;align-items:flex-start;gap:14px;position:relative;padding-bottom:22px;">
-            <!-- Vertical connecting line -->
-            <div x-show="i < steps.length - 1"
-                style="position:absolute;left:10px;top:26px;width:2px;height:calc(100% - 18px);background:var(--border);border-radius:1px;"
-                :style="step.status === 'done' || step.status === 'skipped' ? 'background:var(--success);' : 'background:var(--border);'">
-            </div>
-            <!-- Step circle -->
-            <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;line-height:1;"
-                :style="{
-                    background: step.status === 'done' ? 'var(--success)' : step.status === 'running' ? 'var(--accent)' : step.status === 'error' ? 'var(--error)' : step.status === 'skipped' ? 'var(--border)' : 'transparent',
-                    border: step.status === 'pending' ? '2px solid var(--border)' : '2px solid transparent',
-                    color: (step.status === 'done' || step.status === 'running' || step.status === 'error') ? '#fff' : 'transparent',
-                    animation: step.status === 'running' ? 'pulse .9s ease-in-out infinite' : 'none',
-                }">
-                <span x-show="step.status === 'done'">✓</span>
-                <span x-show="step.status === 'running'" style="font-size:.5rem;">●</span>
-                <span x-show="step.status === 'error'">✗</span>
-                <span x-show="step.status === 'skipped'" style="color:var(--text-muted);">−</span>
-            </div>
-            <!-- Step label + message -->
-            <div style="flex:1;min-width:0;">
-                <span x-text="step.label"
-                    :style="{fontSize:'.85rem',fontWeight:step.status==='running'?'600':'400',color:step.status==='pending'?'var(--text-muted)':step.status==='error'?'var(--error)':'var(--text)'}">
-                </span>
-                <span x-show="step.message && step.status !== 'pending'"
-                    x-text="' · ' + step.message"
-                    style="font-size:.78rem;color:var(--text-muted);word-break:break-all;">
+    <!-- Horizontal Progress Bar -->
+    <div v-if="loading" style="margin-top:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;">
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px;">Agent 实时进度</p>
+        <!-- Progress track -->
+        <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;">
+            <!-- Track line -->
+            <div style="position:absolute;top:10px;left:0;right:0;height:3px;background:var(--border);border-radius:2px;z-index:0;"></div>
+            <!-- Filled track -->
+            <div style="position:absolute;top:10px;left:0;height:3px;background:var(--success);border-radius:2px;z-index:1;transition:width .4s ease;"
+                :style="{ width: filledPercent + '%' }"></div>
+            <!-- Steps -->
+            <div v-for="(step, i) in steps" :key="step.key"
+                style="display:flex;flex-direction:column;align-items:center;position:relative;z-index:2;flex:1;min-width:0;">
+                <!-- Circle -->
+                <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;margin-bottom:8px;transition:all .3s ease;"
+                    :style="{
+                        background: step.status === 'done' ? 'var(--success)' : step.status === 'running' ? 'var(--accent)' : step.status === 'error' ? 'var(--error)' : step.status === 'skipped' ? 'var(--border)' : '#fff',
+                        border: step.status === 'pending' ? '2px solid var(--border)' : '2px solid transparent',
+                        color: (step.status === 'done' || step.status === 'running' || step.status === 'error') ? '#fff' : step.status === 'skipped' ? 'var(--text-muted)' : 'transparent',
+                        animation: step.status === 'running' ? 'pulse .9s ease-in-out infinite' : 'none',
+                        boxShadow: step.status === 'running' ? '0 0 0 4px rgba(255,90,31,.15)' : 'none'
+                    }">
+                    <span v-if="step.status === 'done'">✓</span>
+                    <span v-if="step.status === 'running'" style="font-size:.45rem;">●</span>
+                    <span v-if="step.status === 'error'">✗</span>
+                    <span v-if="step.status === 'skipped'">−</span>
+                </div>
+                <!-- Label -->
+                <span style="font-size:.7rem;text-align:center;line-height:1.3;"
+                    :style="{ color: step.status === 'pending' ? 'var(--text-muted)' : step.status === 'running' ? 'var(--accent)' : step.status === 'error' ? 'var(--error)' : 'var(--text)', fontWeight: step.status === 'running' ? '600' : '400' }">
+                    {{ step.label }}
                 </span>
             </div>
         </div>
-    </template>
-</div>
+        <!-- Current message -->
+        <p v-if="currentMessage" style="text-align:center;font-size:.78rem;color:var(--text-muted);margin-top:16px;transition:all .3s ease;">
+            {{ currentMessage }}
+        </p>
+    </div>
 
-<!-- Done Modal -->
-<div x-show="showDoneModal" x-cloak style="display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;" @click.self="closeDoneModal">
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:360px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <div style="width:56px;height:56px;border-radius:50%;background:var(--success);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
-            <span style="color:#fff;font-size:1.6rem;">✓</span>
-        </div>
-        <h3 style="margin-bottom:6px;">生成成功</h3>
-        <p style="color:var(--text-secondary);font-size:.84rem;margin-bottom:24px;">文案已保存为草稿，可以前往文章详情查看</p>
-        <div style="display:flex;gap:10px;justify-content:center;">
-            <button @click="stayAndReset" class="btn btn-outline">留在首页</button>
-            <button @click="goToPost" class="btn btn-accent">查看详情</button>
+    <!-- Done Modal -->
+    <div v-if="showDoneModal" style="display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;" @click.self="closeDoneModal">
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:360px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--success);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#fff;font-size:1.6rem;">✓</span>
+            </div>
+            <h3 style="margin-bottom:6px;">生成成功</h3>
+            <p style="color:var(--text-secondary);font-size:.84rem;margin-bottom:24px;">文案已保存为草稿，可以前往文章详情查看</p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button @click="stayAndReset" class="btn btn-outline">留在首页</button>
+                <button @click="goToPost" class="btn btn-accent">查看详情</button>
+            </div>
         </div>
     </div>
+
+    <AppToast :show="toastShow" :message="toastMessage" :type="toastType" @close="toastShow = false" />
 </div>
+{% endblock %}
+{% block scripts %}
+<script defer src="/static/index-form.js"></script>
 {% endblock %}

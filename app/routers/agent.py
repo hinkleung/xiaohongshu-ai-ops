@@ -24,6 +24,7 @@ async def trigger_generate(req: GenerateRequest, request: Request):
     async def event_stream():
         async for event in runner.run_generate(
             theme=req.theme, images=req.images, ai_provider=req.ai_provider or "",
+            activity_description=req.activity_description or "",
         ):
             if await request.is_disconnected():
                 logger.info("SSE client disconnected")
@@ -72,6 +73,7 @@ async def _background_publish(post_id: int):
             return
         if result.get("error"):
             post.status = "failed"
+            post.error_message = result["error"]
             logger.error("Background publish post %s failed: %s", post_id, result["error"])
         else:
             post.status = "published"
@@ -97,6 +99,7 @@ async def trigger_regenerate(post_id: int, request: Request):
             async for event in runner.run_generate(
                 theme=post.theme or "", images=post.get_images(),
                 ai_provider=post.ai_provider or "",
+                activity_description=post.activity_description or "",
             ):
                 if await request.is_disconnected():
                     break

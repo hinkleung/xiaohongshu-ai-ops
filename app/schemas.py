@@ -7,16 +7,14 @@ class AIConfigCreate(BaseModel):
     provider: str = Field(..., pattern="^(claude|openai|deepseek)$")
     api_key: str
     api_base: Optional[str] = None
-    quick_model: str
-    deep_model: str
+    model: str  # single model used for all agent nodes
 
 
 class AIConfigUpdate(BaseModel):
     provider: Optional[str] = None
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    quick_model: Optional[str] = None
-    deep_model: Optional[str] = None
+    model: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -24,8 +22,7 @@ class AIConfigResponse(BaseModel):
     id: int
     provider: str
     api_base: Optional[str] = None
-    quick_model: str
-    deep_model: str
+    model: str  # merged field — same value stored in quick_model & deep_model
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -39,6 +36,7 @@ class PostCreate(BaseModel):
     tags: list[str] = []
     images: list[str] = []
     theme: Optional[str] = None
+    activity_description: Optional[str] = None
 
 
 class PostUpdate(BaseModel):
@@ -47,6 +45,7 @@ class PostUpdate(BaseModel):
     tags: Optional[list[str]] = None
     images: Optional[list[str]] = None
     theme: Optional[str] = None
+    activity_description: Optional[str] = None
 
 
 class PostResponse(BaseModel):
@@ -58,6 +57,8 @@ class PostResponse(BaseModel):
     status: str
     xhs_feed_id: Optional[str] = None
     xhs_note_url: Optional[str] = None
+    error_message: Optional[str] = None
+    activity_description: Optional[str] = None
     theme: Optional[str] = None
     ai_provider: Optional[str] = None
     publish_time: Optional[datetime] = None
@@ -69,6 +70,7 @@ class PostResponse(BaseModel):
 
 class GenerateRequest(BaseModel):
     theme: str
+    activity_description: Optional[str] = None  # long raw activity brief
     images: list[str] = []
     ai_provider: Optional[str] = None   # auto-select active if None
 

@@ -1,26 +1,28 @@
 {% extends "base.html" %}
 {% block title %}设置 — 小红书 AI 运营平台{% endblock %}
 {% block content %}
+<script id="page-data" type="application/json"><< {"configs": configs} | tojson | safe >></script>
+
 <h1>设置</h1>
 
-<div class="sec">
-    <h2>AI Provider</h2>
-    <p class="sub">管理 AI 提供商配置</p>
-    <div x-data="aiConfigManager">
-        <template x-for="cfg in configs" :key="cfg.id">
+<div id="app" v-cloak>
+    <!-- ── AI Provider ── -->
+    <div class="sec">
+        <h2>AI Provider</h2>
+        <p class="sub">管理 AI 提供商配置</p>
+        <template v-for="cfg in configs" :key="cfg.id">
             <div class="card" style="margin-bottom:10px;">
                 <div class="card-header">
                     <span class="card-title" style="display:flex;align-items:center;gap:8px;">
-                        <span x-text="cfg.provider.toUpperCase()"></span>
-                        <span x-show="cfg.is_active" class="badge badge-published">当前</span>
+                        {{ cfg.provider.toUpperCase() }}
+                        <span v-if="cfg.is_active" class="badge badge-published">当前</span>
                     </span>
                 </div>
-                <div class="row" style="font-size:.84rem;color:var(--text-secondary);">
-                    <div>Quick: <code x-text="cfg.quick_model"></code></div>
-                    <div>Deep: <code x-text="cfg.deep_model"></code></div>
+                <div style="font-size:.84rem;color:var(--text-secondary);">
+                    模型：<code>{{ cfg.model }}</code>
                 </div>
                 <div class="flex" style="margin-top:10px;">
-                    <button @click="activate(cfg.id)" x-show="!cfg.is_active" class="btn btn-outline btn-sm">启用</button>
+                    <button @click="activate(cfg.id)" v-if="!cfg.is_active" class="btn btn-outline btn-sm">启用</button>
                     <button @click="deleteConfig(cfg.id)" class="btn btn-ghost btn-sm" style="color:var(--error);">删除</button>
                 </div>
             </div>
@@ -31,113 +33,109 @@
             <form @submit.prevent="addConfig" class="card" style="margin-top:10px;">
                 <div class="field">
                     <label>Provider</label>
-                    <select x-model="form.provider" class="select" required>
+                    <select v-model="form.provider" class="select" required>
                         <option value="">选择…</option><option>openai</option><option>claude</option><option>deepseek</option>
                     </select>
                 </div>
-                <div class="field"><label>API Key</label><input type="password" x-model="form.api_key" class="input" required placeholder="sk-…"></div>
-                <div class="field"><label>API Base URL <span style="font-weight:400;color:var(--text-muted);">（可选）</span></label><input type="text" x-model="form.api_base" class="input" placeholder="留空使用默认"></div>
-                <div class="row">
-                    <div class="field"><label>Quick Model</label><input type="text" x-model="form.quick_model" class="input" required placeholder="gpt-4o-mini"></div>
-                    <div class="field"><label>Deep Model</label><input type="text" x-model="form.deep_model" class="input" required placeholder="gpt-4o"></div>
-                </div>
+                <div class="field"><label>API Key</label><input type="password" v-model="form.api_key" class="input" required placeholder="sk-…"></div>
+                <div class="field"><label>API Base URL <span style="font-weight:400;color:var(--text-muted);">（可选）</span></label><input type="text" v-model="form.api_base" class="input" placeholder="留空使用默认"></div>
+                <div class="field"><label>Model</label><input type="text" v-model="form.model" class="input" required placeholder="gpt-4o-mini"></div>
                 <button type="submit" class="btn btn-accent">保存</button>
             </form>
         </details>
     </div>
-</div>
 
-<div class="sec">
-    <h2>小红书账号</h2>
-    <p class="sub">管理 MCP 连接和登录状态</p>
-    <div x-data="xhsStatus" class="card">
-        <!-- Status row -->
-        <div class="flex">
-            <p x-show="loading" style="color:var(--text-muted);">检查中…</p>
-            <span x-show="!loading && status?.is_logged_in" class="badge badge-published" style="font-size:.88rem;">已登录</span>
-            <span x-show="!loading && status && !status.is_logged_in" class="badge badge-failed" style="font-size:.88rem;">未登录</span>
-        </div>
+    <!-- ── 小红书账号 ── -->
+    <div class="sec">
+        <h2>小红书账号</h2>
+        <p class="sub">管理 MCP 连接和登录状态</p>
+        <div class="card">
+            <div class="flex">
+                <p v-if="xhsLoading" style="color:var(--text-muted);">检查中…</p>
+                <span v-if="!xhsLoading && xhsStatus?.is_logged_in" class="badge badge-published" style="font-size:.88rem;">已登录</span>
+                <span v-if="!xhsLoading && xhsStatus && !xhsStatus.is_logged_in" class="badge badge-failed" style="font-size:.88rem;">未登录</span>
+            </div>
 
-        <!-- Account info card: shows after login detected, with loading skeleton -->
-        <div x-show="status?.is_logged_in" style="margin-top:14px;padding:14px;background:var(--bg-hover);border-radius:var(--radius-sm);font-size:.84rem;">
-            <!-- Loading skeleton -->
-            <div x-show="loadingProfile" style="display:flex;align-items:center;gap:10px;">
-                <div style="width:40px;height:40px;border-radius:50%;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
-                <div style="flex:1;">
-                    <div style="width:80px;height:14px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;margin-bottom:6px;"></div>
-                    <div style="width:120px;height:10px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
+            <div v-if="xhsStatus?.is_logged_in" style="margin-top:14px;padding:14px;background:var(--bg-hover);border-radius:var(--radius-sm);font-size:.84rem;">
+                <div v-if="xhsLoadingProfile" style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
+                    <div style="flex:1;">
+                        <div style="width:80px;height:14px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;margin-bottom:6px;"></div>
+                        <div style="width:120px;height:10px;border-radius:4px;background:var(--border);animation:pulse .9s ease-in-out infinite;"></div>
+                    </div>
                 </div>
-            </div>
-            <!-- Profile loaded -->
-            <div x-show="!loadingProfile && profile" style="display:flex;align-items:center;gap:10px;">
-                <img x-show="profile?.userBasicInfo?.images" :src="profile?.userBasicInfo?.images" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--border);">
-                <div>
-                    <p style="font-weight:600;" x-text="profile?.userBasicInfo?.nickname || '(未知)'"></p>
-                    <p style="color:var(--text-muted);font-size:.78rem;">小红书号：<span x-text="profile?.userBasicInfo?.redId || '-'"></span></p>
-                    <p x-show="profile?.userBasicInfo?.desc" style="color:var(--text-secondary);font-size:.78rem;margin-top:2px;" x-text="profile?.userBasicInfo?.desc"></p>
+                <div v-if="!xhsLoadingProfile && xhsProfile" style="display:flex;align-items:center;gap:10px;">
+                    <img v-if="xhsProfile?.userBasicInfo?.images" :src="xhsProfile.userBasicInfo.images" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--border);">
+                    <div>
+                        <p style="font-weight:600;">{{ xhsProfile.userBasicInfo?.nickname || '(未知)' }}</p>
+                        <p style="color:var(--text-muted);font-size:.78rem;">小红书号：{{ xhsProfile.userBasicInfo?.redId || '-' }}</p>
+                        <p v-if="xhsProfile.userBasicInfo?.desc" style="color:var(--text-secondary);font-size:.78rem;margin-top:2px;">{{ xhsProfile.userBasicInfo.desc }}</p>
+                    </div>
                 </div>
+                <p v-if="!xhsLoadingProfile && !xhsProfile" style="color:var(--text-muted);">未能加载帐号信息</p>
             </div>
-            <!-- Profile failed -->
-            <p x-show="!loadingProfile && !profile" style="color:var(--text-muted);">未能加载帐号信息</p>
-        </div>
 
-        <!-- My notes count -->
-        <p x-show="profile?.feeds" style="font-size:.82rem;color:var(--text-secondary);margin-top:8px;">
-            📒 我的笔记：<span x-text="profile?.feeds?.length || 0"></span> 篇
-        </p>
+            <p v-if="xhsProfile?.feeds" style="font-size:.82rem;color:var(--text-secondary);margin-top:8px;">
+                📒 我的笔记：{{ xhsProfile.feeds.length || 0 }} 篇
+            </p>
 
-        <!-- Buttons -->
-        <div class="flex mt-4">
-            <button @click="checkStatus" class="btn btn-outline btn-sm">刷新状态</button>
-            <button @click="showQRModal()" x-show="!status?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
-            <button @click="showLogoutModal()" x-show="status?.is_logged_in" class="btn btn-ghost btn-sm" style="color:var(--color-error);">退出登录</button>
-        </div>
-    </div>
-</div>
-
-<!-- QR Modal -->
-<div id="qr-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:380px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <h3 style="margin-bottom:6px;font-size:1.1rem;text-align:center;color:var(--color-text);">扫码登录小红书</h3>
-        <p id="qr-loading" style="text-align:center;color:var(--color-text-secondary);padding:32px 0;font-size:.88rem;">正在获取登录二维码…</p>
-        <div id="qr-content" style="display:none;">
-            <p style="text-align:center;color:var(--color-text-secondary);font-size:.84rem;margin-bottom:18px;">打开小红书 App 扫描二维码</p>
-            <div style="display:inline-block;padding:16px;background:#fff;border:1px solid var(--color-border);border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-                <img id="qr-image" src="" alt="登录二维码" style="display:block;width:220px;height:220px;border-radius:8px;">
+            <div class="flex mt-4">
+                <button @click="checkXhsStatus" class="btn btn-outline btn-sm">刷新状态</button>
+                <button @click="openQR" v-if="!xhsStatus?.is_logged_in" class="btn btn-accent btn-sm">登录小红书</button>
+                <button @click="showLogoutModal = true" v-if="xhsStatus?.is_logged_in" class="btn btn-ghost btn-sm" style="color:var(--error);">退出登录</button>
             </div>
-            <p id="qr-expire" style="text-align:center;font-size:.78rem;color:var(--color-text-secondary);margin-top:12px;display:none;"></p>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
-            <button onclick="refreshQRCode()" id="qr-refresh-btn" class="btn btn-outline btn-sm">刷新二维码</button>
-            <button onclick="closeQRModal()" class="btn btn-accent" style="min-width:120px;justify-content:center;text-align:center;">完成</button>
         </div>
     </div>
-</div>
 
-<!-- Delete Confirm Modal -->
-<div id="delete-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <h3 style="margin-bottom:10px;font-size:1.1rem;text-align:center;">确认删除</h3>
-        <p style="text-align:center;color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">此操作不可撤销，确定要删除这个 Provider 吗？</p>
-        <div style="display:flex;gap:10px;justify-content:center;">
-            <button onclick="closeDeleteModal()" class="btn btn-outline">取消</button>
-            <button id="delete-confirm-btn" class="btn btn-danger">确认删除</button>
+    <!-- ── QR Modal ── -->
+    <div v-if="showQR" style="display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;" @click.self="closeQR">
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:32px;max-width:380px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+            <h3 style="margin-bottom:6px;font-size:1.1rem;">扫码登录小红书</h3>
+            <p v-if="qrLoading" style="text-align:center;color:var(--text-secondary);padding:32px 0;font-size:.88rem;">正在获取登录二维码…</p>
+            <template v-if="!qrLoading && qrImage">
+                <p style="text-align:center;color:var(--text-secondary);font-size:.84rem;margin-bottom:18px;">打开小红书 App 扫描二维码</p>
+                <div style="display:inline-block;padding:16px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+                    <img :src="qrImage" alt="登录二维码" style="display:block;width:220px;height:220px;border-radius:8px;">
+                </div>
+                <p v-if="qrExpireText" style="text-align:center;font-size:.78rem;color:var(--text-secondary);margin-top:12px;">{{ qrExpireText }}</p>
+            </template>
+            <p v-if="qrError" style="text-align:center;color:var(--error);font-size:.84rem;padding:32px 0;">{{ qrError }}</p>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
+                <button @click="refreshQR" class="btn btn-outline btn-sm">刷新二维码</button>
+                <button @click="closeQR" class="btn btn-accent" style="min-width:120px;">完成</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Logout Confirm Modal -->
-<div id="logout-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-items:center;justify-content:center;">
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
-        <h3 style="margin-bottom:10px;font-size:1.1rem;text-align:center;">确认退出</h3>
-        <p style="text-align:center;color:var(--color-text-secondary);font-size:.88rem;margin-bottom:20px;">确定要退出小红书登录吗？</p>
-        <div style="display:flex;gap:10px;justify-content:center;">
-            <button onclick="closeLogoutModal()" class="btn btn-outline">取消</button>
-            <button onclick="confirmLogout()" class="btn btn-danger">确认退出</button>
+    <!-- ── Modals ── -->
+    <!-- Delete Config Modal -->
+    <div v-if="showDeleteConfigModal" style="position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;" @click.self="showDeleteConfigModal = false">
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+            <h3 style="margin-bottom:10px;font-size:1.1rem;">确认删除</h3>
+            <p style="color:var(--text-secondary);font-size:.88rem;margin-bottom:20px;">此操作不可撤销，确定要删除这个 Provider 吗？</p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button @click="showDeleteConfigModal = false" class="btn btn-outline">取消</button>
+                <button @click="confirmDeleteConfig" class="btn btn-danger">确认删除</button>
+            </div>
         </div>
     </div>
+
+    <!-- Logout Modal -->
+    <div v-if="showLogoutModal" style="position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;" @click.self="showLogoutModal = false">
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15);">
+            <h3 style="margin-bottom:10px;font-size:1.1rem;">确认退出</h3>
+            <p style="color:var(--text-secondary);font-size:.88rem;margin-bottom:20px;">确定要退出小红书登录吗？</p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button @click="showLogoutModal = false" class="btn btn-outline">取消</button>
+                <button @click="doLogout" class="btn btn-danger">确认退出</button>
+            </div>
+        </div>
+    </div>
+
+    <AppToast :show="toastShow" :message="toastMessage" :type="toastType" @close="toastShow = false" />
 </div>
 
+<!-- ── MCP Service (static) ── -->
 <div class="sec">
     <h2>MCP 服务</h2>
     <p class="sub">xiaohongshu-mcp 后端</p>
@@ -152,244 +150,7 @@
         </div>
     </div>
 </div>
-
-<script>
-/* ==================== QR Modal ==================== */
-var qrTimer = null;
-
-function onQrEsc(e) { if (e.key === 'Escape') closeQRModal(); }
-
-function parseTimeout(t) {
-    var m = t.match(/(\d+)m/), s = t.match(/(\d+)s/);
-    return (m ? parseInt(m[1]) * 60 : 0) + (s ? parseInt(s[1]) : 0);
-}
-
-function formatCountdown(sec) {
-    return Math.floor(sec / 60) + '分' + (sec % 60) + '秒';
-}
-
-async function showQRModal() {
-    var m = document.getElementById('qr-modal');
-    var loading = document.getElementById('qr-loading');
-    var content = document.getElementById('qr-content');
-    var img = document.getElementById('qr-image');
-    var expire = document.getElementById('qr-expire');
-    if (qrTimer) clearInterval(qrTimer);
-    img.style.opacity = '1';
-    m.style.display = 'flex';
-    document.addEventListener('keydown', onQrEsc);
-    loading.style.display = 'block';
-    content.style.display = 'none';
-    expire.style.display = 'none';
-    try {
-        var r = await fetch('/api/xhs/login', {method:'POST'});
-        var d = await r.json();
-        img.src = d.img;
-        loading.style.display = 'none';
-        content.style.display = 'block';
-        if (d.timeout) {
-            var sec = parseTimeout(d.timeout);
-            if (sec > 0) {
-                expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
-                expire.style.display = 'block';
-                qrTimer = setInterval(function() {
-                    sec--;
-                    if (sec <= 0) {
-                        clearInterval(qrTimer);
-                        expire.textContent = '二维码已过期，请重新获取';
-                        img.style.opacity = '0.3';
-                    } else {
-                        expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
-                    }
-                }, 1000);
-            }
-        }
-    } catch(e) {
-        loading.textContent = '获取失败，请重试';
-    }
-}
-
-async function refreshQRCode() {
-    var loading = document.getElementById('qr-loading');
-    var content = document.getElementById('qr-content');
-    var img = document.getElementById('qr-image');
-    var expire = document.getElementById('qr-expire');
-    var btn = document.getElementById('qr-refresh-btn');
-    if (qrTimer) clearInterval(qrTimer);
-    img.style.opacity = '1';
-    loading.style.display = 'block';
-    content.style.display = 'none';
-    expire.style.display = 'none';
-    btn.disabled = true;
-    btn.textContent = '刷新中…';
-    try {
-        var r = await fetch('/api/xhs/login', {method:'POST'});
-        var d = await r.json();
-        img.src = d.img;
-        loading.style.display = 'none';
-        content.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = '刷新二维码';
-        if (d.timeout) {
-            var sec = parseTimeout(d.timeout);
-            if (sec > 0) {
-                expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
-                expire.style.display = 'block';
-                qrTimer = setInterval(function() {
-                    sec--;
-                    if (sec <= 0) {
-                        clearInterval(qrTimer);
-                        expire.textContent = '二维码已过期，请重新获取';
-                        img.style.opacity = '0.3';
-                    } else {
-                        expire.textContent = '二维码 ' + formatCountdown(sec) + ' 后过期';
-                    }
-                }, 1000);
-            }
-        }
-    } catch(e) {
-        loading.textContent = '获取失败，请重试';
-        btn.disabled = false;
-        btn.textContent = '刷新二维码';
-    }
-}
-
-function closeQRModal() {
-    if (qrTimer) clearInterval(qrTimer);
-    document.removeEventListener('keydown', onQrEsc);
-    document.getElementById('qr-modal').style.display = 'none';
-    // 扫码后 MCP 可能还没完成 session 建立，延迟 2s + 带上轮询标记
-    setTimeout(function() {
-        window.dispatchEvent(new CustomEvent('xhs-refresh', {detail: {poll: true}}));
-    }, 2000);
-}
-
-/* ==================== Delete Modal ==================== */
-var deleteTargetId = null;
-
-function showDeleteModal(id) {
-    deleteTargetId = id;
-    document.getElementById('delete-modal').style.display = 'flex';
-    document.addEventListener('keydown', onDeleteEsc);
-}
-
-function onDeleteEsc(e) { if (e.key === 'Escape') closeDeleteModal(); }
-
-function closeDeleteModal() {
-    deleteTargetId = null;
-    document.removeEventListener('keydown', onDeleteEsc);
-    document.getElementById('delete-modal').style.display = 'none';
-}
-
-document.getElementById('delete-confirm-btn').addEventListener('click', async function() {
-    var id = deleteTargetId;
-    closeDeleteModal();
-    await fetch('/api/configs/ai/' + id, {method: 'DELETE'});
-    // Trigger Alpine refresh
-    window.dispatchEvent(new CustomEvent('configs-changed'));
-});
-
-/* ==================== Logout Modal ==================== */
-function showLogoutModal() {
-    document.getElementById('logout-modal').style.display = 'flex';
-    document.addEventListener('keydown', onLogoutEsc);
-}
-
-function onLogoutEsc(e) { if (e.key === 'Escape') closeLogoutModal(); }
-
-function closeLogoutModal() {
-    document.removeEventListener('keydown', onLogoutEsc);
-    document.getElementById('logout-modal').style.display = 'none';
-}
-
-async function confirmLogout() {
-    closeLogoutModal();
-    await fetch('/api/xhs/logout', {method: 'DELETE'});
-    try { localStorage.removeItem('xhs_login_cache'); } catch(e) {}
-    // Don't call status API — just update UI directly
-    window.dispatchEvent(new CustomEvent('xhs-logout'));
-}
-
-/* ==================== Alpine Components ==================== */
-document.addEventListener('alpine:init', function() {
-    Alpine.data('aiConfigManager', function() {
-        return {
-            configs: {{ configs | tojson | safe }},
-            form: {provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''},
-            init: function() {
-                var component = this;
-                window.addEventListener('configs-changed', function() {
-                    fetch('/api/configs/ai').then(function(r){return r.json();}).then(function(d){component.configs = d;});
-                });
-            },
-            addConfig: async function() {
-                var r = await fetch('/api/configs/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.form)});
-                if(r.ok){this.configs.push(await r.json());this.form={provider:'',api_key:'',api_base:'',quick_model:'',deep_model:''};
-                    var self=this;this.$nextTick(function(){document.getElementById('add-provider-panel').open=false;});}
-            },
-            activate: async function(id){await fetch('/api/configs/ai/'+id+'/activate',{method:'POST'});this.configs.forEach(function(c){c.is_active=c.id===id;});},
-            deleteConfig: function(id){showDeleteModal(id);},
-        };
-    });
-
-    Alpine.data('xhsStatus', function() {
-        var CACHE_KEY = 'xhs_login_cache';
-        var CACHE_TTL = 30 * 60 * 1000; // 30 min
-        function readCache() {
-            try { var d=JSON.parse(localStorage.getItem(CACHE_KEY)); if(d&&d.ts&&(Date.now()-d.ts<CACHE_TTL)) return d; } catch(e) {}
-            return null;
-        }
-        function writeCache(data) {
-            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(),status:data.status||data,profile:data.profile||null})); } catch(e) {}
-        }
-        function clearCache() { try { localStorage.removeItem(CACHE_KEY); } catch(e) {} }
-
-        return {
-            status:{},loading:false,profile:null,loadingProfile:false,
-            init: function(){
-                var c=this;
-                var cached = readCache();
-                if (cached) {
-                    // Use cached data immediately — no API call needed
-                    this.status = cached.status || {};
-                    this.profile = cached.profile;
-                } else {
-                    // First visit or cache expired — must check
-                    c.checkStatus();
-                }
-                window.addEventListener('xhs-refresh',function(e){var poll=e.detail&&e.detail.poll;c.checkStatus(poll);});
-                window.addEventListener('xhs-logout',function(){c.status={is_logged_in:false};c.profile=null;});
-            },
-            checkStatus: async function(poll, silent){
-                if (!silent) this.loading = true;
-                var maxRetries = poll ? 3 : 1;
-                var delay = 1500;
-                var result = {is_logged_in: false};
-                for (var i = 0; i < maxRetries; i++) {
-                    try { var r = await fetch('/api/xhs/status'); result = await r.json(); } catch(e) {}
-                    if (result && result.is_logged_in) break;
-                    if (i < maxRetries - 1) await new Promise(function(resolve){setTimeout(resolve,delay);});
-                }
-                var wasLoggedIn = this.status && this.status.is_logged_in;
-                this.status = result;
-                if (result && result.is_logged_in) {
-                    if (!wasLoggedIn || !this.profile) await this.fetchProfile();
-                    // Only write cache after profile is ready (fetchProfile handles its own write)
-                    if (this.profile) writeCache({status: result, profile: this.profile});
-                    else writeCache({status: result, profile: null});
-                } else {
-                    clearCache();
-                    this.profile = null;
-                }
-                this.loading = false;
-            },
-            fetchProfile: async function(){
-                this.loadingProfile = true;
-                try { var r = await fetch('/api/xhs/me'); this.profile = await r.json(); writeCache({status:this.status,profile:this.profile}); } catch(e) { this.profile = null; }
-                this.loadingProfile = false;
-            },
-        };
-    });
-});
-</script>
+{% endblock %}
+{% block scripts %}
+<script defer src="/static/settings-page.js"></script>
 {% endblock %}

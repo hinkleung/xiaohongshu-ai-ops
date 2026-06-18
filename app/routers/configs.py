@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/configs/ai", tags=["AI Config"])
 
 @router.get("", response_model=list[AIConfigResponse])
 def list_configs(db: Session = Depends(get_db)):
-    return db.query(AIConfig).order_by(AIConfig.created_at.desc()).all()
+    return db.query(AIConfig).order_by(AIConfig.created_at.asc()).all()
 
 
 @router.post("", response_model=AIConfigResponse, status_code=201)
@@ -21,15 +21,15 @@ def create_config(data: AIConfigCreate, db: Session = Depends(get_db)):
         provider=data.provider,
         api_key=encrypt_api_key(data.api_key),
         api_base=data.api_base,
-        quick_model=data.quick_model,
-        deep_model=data.deep_model,
+        quick_model=data.model,
+        deep_model=data.model,  # single model used for all tiers
     )
     if db.query(AIConfig).count() == 0:
         config.is_active = True
     db.add(config)
     db.commit()
     db.refresh(config)
-    logger.info("AI config %d created provider=%s", config.id, config.provider)
+    logger.info("AI config %d created provider=%s model=%s", config.id, config.provider, data.model)
     return config
 
 
@@ -40,7 +40,10 @@ def update_config(config_id: int, data: AIConfigUpdate, db: Session = Depends(ge
         raise HTTPException(404, "Config not found")
     if data.api_key is not None:
         config.api_key = encrypt_api_key(data.api_key)
-    for field in ("provider", "api_base", "quick_model", "deep_model"):
+    if data.model is not None:
+        config.quick_model = data.model
+        config.deep_model = data.model
+    for field in ("provider", "api_base"):
         val = getattr(data, field, None)
         if val is not None:
             setattr(config, field, val)

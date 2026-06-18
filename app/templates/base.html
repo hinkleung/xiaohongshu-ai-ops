@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}小红书 AI 运营平台{% endblock %}</title>
-    <script defer src="/static/app.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script defer src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script defer src="/static/vue.common.js"></script>
+    {% block scripts %}{% endblock %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -47,7 +48,7 @@
             --shadow-hover: 0 4px 12px rgba(0,0,0,.3);
         }
 
-        [x-cloak] { display: none !important; }
+        [v-cloak] { display: none !important; }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { font-size: 16px; -webkit-font-smoothing: antialiased; }
         body {
@@ -121,6 +122,8 @@
         .btn-soft:hover { background: #ffe8db; }
         .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-outline:hover { background: var(--bg-hover); }
+        .btn-danger { background: var(--error); color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
         .btn-ghost { background: transparent; color: var(--text-secondary); }
         .btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
         .btn-sm { padding: 6px 14px; font-size: .8rem; border-radius: 20px; }

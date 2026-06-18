@@ -11,8 +11,7 @@ logger = logging.getLogger("app.llm_factory")
 class ProviderConfig:
     provider: str            # claude / openai / deepseek
     api_key: str
-    quick_model: str
-    deep_model: str
+    model: str               # single model used for all agent nodes
     api_base: Optional[str] = None
 
 
@@ -20,10 +19,10 @@ class LLMFactory:
     """Multi-provider LLM factory with quick/deep tier routing."""
 
     @staticmethod
-    def create(config: ProviderConfig, tier: Literal["quick", "deep"]):
-        model_name = config.quick_model if tier == "quick" else config.deep_model
+    def create(config: ProviderConfig, tier: Literal["quick", "deep"] = "quick"):
+        model_name = config.model
         provider = config.provider.lower()
-        logger.info("Creating LLM: provider=%s tier=%s model=%s", provider, tier, model_name)
+        logger.info("Creating LLM: provider=%s model=%s", provider, model_name)
 
         if provider == "openai":
             kwargs = {"model": model_name, "api_key": config.api_key}
@@ -50,16 +49,14 @@ class LLMFactory:
             raise ValueError(f"Unsupported provider: {provider}")
 
     @staticmethod
-    def from_db_config(db_config, tier: Literal["quick", "deep"]):
+    def from_db_config(db_config):
         """Create LLM from AIConfig DB model."""
         from app.config import decrypt_api_key
         return LLMFactory.create(
             ProviderConfig(
                 provider=db_config.provider,
                 api_key=decrypt_api_key(db_config.api_key),
-                quick_model=db_config.quick_model,
-                deep_model=db_config.deep_model,
+                model=db_config.model,
                 api_base=db_config.api_base,
             ),
-            tier=tier,
         )

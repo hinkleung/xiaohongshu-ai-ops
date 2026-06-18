@@ -17,6 +17,10 @@ class AIConfig(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @property
+    def model(self) -> str:
+        return self.quick_model
+
 
 class Post(Base):
     __tablename__ = "posts"
@@ -29,6 +33,8 @@ class Post(Base):
     status = Column(String(20), nullable=False, default="draft")
     xhs_feed_id = Column(String(100), nullable=True)
     xhs_note_url = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)  # publish failure reason
+    activity_description = Column(Text, nullable=True)  # original activity brief (can be long)
     theme = Column(Text, nullable=True)
     ai_provider = Column(String(50), nullable=True)
     publish_time = Column(DateTime, nullable=True)

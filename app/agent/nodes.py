@@ -27,7 +27,7 @@ def parse_generated_content(text: str) -> tuple[str, str, list[str]]:
             title = s
         elif s.startswith("#"):
             for part in s.split("#"):
-                tag = part.strip()
+                tag = part.strip().lstrip('#')
                 if tag:
                     tags.append(tag)
         else:
@@ -45,9 +45,12 @@ async def _call_llm(llm, prompt: str, node_name: str) -> str:
 
 
 async def theme_analyzer_node(state: AgentState, quick_llm, db) -> dict:
-    """Node 1: Analyze theme -> style, keywords, audience."""
+    """Node 1: Analyze theme -> short theme, style, keywords, audience."""
     logger.info("Node 1 theme_analyzer: theme=%r", state.get("theme", "")[:80])
-    prompt = THEME_ANALYZER_PROMPT.format(theme=state["theme"])
+    prompt = THEME_ANALYZER_PROMPT.format(
+        activity_description=state.get("activity_description") or state["theme"],
+        theme=state["theme"],
+    )
     content = await _call_llm(quick_llm, prompt, "theme_analyzer")
     content = re.sub(r'^```(?:json)?\s*', '', content)
     content = re.sub(r'\s*```$', '', content)
@@ -59,7 +62,8 @@ async def content_generator_node(state: AgentState, quick_llm, db) -> dict:
     logger.info("Node 2 content_generator: generating draft")
     analysis = state.get("theme_analysis", {})
     prompt = CONTENT_GENERATOR_PROMPT.format(
-        theme=state["theme"],
+        activity_description=state.get("activity_description") or state["theme"],
+        theme=analysis.get("short_theme") or state.get("theme", ""),
         style=analysis.get("style") or "真实分享",
         keywords=", ".join(analysis.get("keywords") or []),
         tone_notes=analysis.get("tone_notes") or "真实车主视角",
@@ -93,21 +97,58 @@ async def humanizer_node(state: AgentState, deep_llm, db) -> dict:
     return {"humanized_content": content}
 
 
+def _calc_title_len(s: str) -> int:
+    """Match MCP xhsutil.CalcTitleLength: Chinese=2bytes, ASCII=1byte, ceil/2."""
+    byte_len = sum(2 if ord(c) > 127 else 1 for c in s)
+    return (byte_len + 1) // 2
+
+
+def _truncate_title(title: str, max_len: int = 20) -> str:
+    """Truncate title to fit within CalcTitleLength limit, preserving whole characters."""
+    if _calc_title_len(title) <= max_len:
+        return title
+    result = ""
+    for c in title:
+        test = result + c
+        if _calc_title_len(test) > max_len:
+            break
+        result = test
+    logger.warning("Title truncated from %d to %d chars: %r → %r",
+                   _calc_title_len(title), _calc_title_len(result), title, result)
+    return result
+
+
 async def xhs_optimizer_node(state: AgentState, deep_llm, db) -> dict:
     """Node 5: Enforce XHS platform rules."""
     logger.info("Node 5 xhs_optimizer: applying platform rules")
     source = state.get("humanized_content") or state["draft_content"]
     title, body, _ = parse_generated_content(source)
-    prompt = XHS_OPTIMIZER_PROMPT.format(content=source, title_len=len(title), body_len=len(body))
+    prompt = XHS_OPTIMIZER_PROMPT.format(content=source, title_len=_calc_title_len(title), body_len=len(body))
     content = await _call_llm(deep_llm, prompt, "xhs_optimizer")
     content = re.sub(r'^```(?:json)?\s*', '', content)
     content = re.sub(r'\s*```$', '', content)
     result = json.loads(content)
+
+    final_title = _truncate_title(result.get("title") or title or "")
+    final_content = result.get("body") or source
+    # Strip inline #tags from body — tags belong in the tags field only
+    final_content = re.sub(r'#\S+', '', final_content).strip()
+    final_tags = result.get("tags") or (parse_generated_content(source)[2])
+    # Strip leading # from tags — frontend and MCP handle their own display
+    final_tags = [t.lstrip('#') for t in final_tags]
+
+    # Enforce tag count: 5-10
+    if len(final_tags) < 5:
+        warnings = result.get("warnings", [])
+        warnings.append(f"标签不足5个（当前{len(final_tags)}），建议补充")
+    else:
+        warnings = result.get("warnings", [])
+
     return {
-        "final_title": result.get("title") or title or "",
-        "final_content": result.get("body") or source,
-        "final_tags": result.get("tags") or (parse_generated_content(source)[2]),
-        "warnings": result.get("warnings", []),
+        "final_title": final_title,
+        "final_content": final_content,
+        "final_tags": final_tags,
+        "warnings": warnings,
     }
 
 
@@ -126,18 +167,25 @@ async def save_draft_node(state: AgentState, llm, db) -> dict:
         if not final_title:
             final_title = parsed_title or state.get("theme", "")[:20]
         if not final_tags:
-            final_tags = parsed_tags
+            final_tags = [t.lstrip('#') for t in parsed_tags]
 
-    logger.info("save_draft: title=%r content_len=%d tags=%d", final_title[:40], len(final_content), len(final_tags))
+    # Use AI-extracted short_theme if user didn't provide a theme
+    resolved_theme = state.get("theme", "")
+    if not resolved_theme.strip():
+        analysis = state.get("theme_analysis", {})
+        resolved_theme = analysis.get("short_theme") or ""
+    logger.info("save_draft: title=%r theme=%r (title_len=%d) content_len=%d tags=%d",
+                final_title[:40], resolved_theme[:20], _calc_title_len(final_title), len(final_content), len(final_tags))
 
     post = Post(
         title=final_title,
         content=final_content,
         status="draft",
-        theme=state["theme"],
+        theme=resolved_theme,
+        activity_description=state.get("activity_description", ""),
         ai_provider=state["ai_provider"],
     )
-    post.set_tags(final_tags)
+    post.set_tags([t.lstrip('#') for t in final_tags])
     post.set_images(state["images"])
     db.add(post)
     db.commit()
@@ -157,7 +205,8 @@ async def publisher_node(state: AgentState, llm, db) -> dict:
     title = state.get("final_title", "")
     content = state.get("final_content", "")
     tags = state.get("final_tags", [])
-    images = state["images"]
+    # Convert /uploads/ paths to /images/ — MCP container mounts ./data/uploads as /images
+    images = [p.replace("/uploads/", "/images/") for p in state["images"]]
 
     # Xiaohongshu requires at least 1 image — hard MCP constraint (min=1)
     if not images:
@@ -165,6 +214,7 @@ async def publisher_node(state: AgentState, llm, db) -> dict:
         logger.warning("Publish blocked: no images for post %s", post_id)
         if post:
             post.status = "failed"
+            post.error_message = error_msg
             db.commit()
         return {"error": error_msg}
 
@@ -199,11 +249,13 @@ async def publisher_node(state: AgentState, llm, db) -> dict:
                     logger.warning("Feed verification attempt %d/%d failed", attempt + 1, len(delays))
 
             if not feed_id:
+                verify_err = "发布验证失败：在笔记列表中未找到已发布的笔记（已等待 %d 秒），可能被小红书拦截或账号异常" % sum(delays)
                 logger.error("Publish verification failed: note '%s' not found in feed after %d attempts", title, len(delays))
                 if post:
                     post.status = "failed"
+                    post.error_message = verify_err
                     db.commit()
-                return {"error": "发布验证失败：在笔记列表中未找到已发布的笔记（已等待 %d 秒），可能被小红书拦截或账号异常" % sum(delays)}
+                return {"error": verify_err}
 
             if post:
                 post.status = "published"
@@ -222,8 +274,10 @@ async def publisher_node(state: AgentState, llm, db) -> dict:
                     err_msg = body.get("details") or body.get("error") or err_msg
                 except Exception:
                     pass
+            full_err = f"发布失败：{err_msg}"
             logger.error("MCP publish threw exception: %s", err_msg)
             if post:
                 post.status = "failed"
+                post.error_message = full_err
                 db.commit()
-            return {"error": f"发布失败：{err_msg}"}
+            return {"error": full_err}

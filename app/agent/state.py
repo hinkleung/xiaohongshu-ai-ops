@@ -4,6 +4,7 @@ from typing import TypedDict, Optional
 class AgentState(TypedDict):
     # Input
     theme: str
+    activity_description: str  # raw long activity brief
     images: list[str]
     ai_provider: str
 

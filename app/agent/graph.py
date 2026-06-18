@@ -58,6 +58,7 @@ class AgentRunner:
 
     async def run_generate(
         self, theme: str, images: list[str], ai_provider: str,
+        activity_description: str = "",
     ) -> AsyncIterator[dict]:
         """Run the generate flow, yielding progress events."""
         logger.info("Agent run started: theme=%r provider=%r images=%d", theme[:80], ai_provider, len(images))
@@ -72,11 +73,11 @@ class AgentRunner:
                 yield {"node": "error", "status": "error", "message": "No active AI config found"}
                 return
 
-            quick_llm = LLMFactory.from_db_config(config, tier="quick")
-            deep_llm = LLMFactory.from_db_config(config, tier="deep")
+            llm = LLMFactory.from_db_config(config)
 
             state: AgentState = {
                 "theme": theme,
+                "activity_description": activity_description or theme,
                 "images": images,
                 "ai_provider": config.provider,
                 "theme_analysis": {},
@@ -119,7 +120,7 @@ class AgentRunner:
 
                 try:
                     fn = node_funcs[node_name]
-                    llm = quick_llm if node_name in ("theme_analyzer", "content_generator") else deep_llm
+                    # All nodes use the same LLM now
                     result = await fn(state, llm, db)
                     state.update(result)
 
@@ -160,7 +161,7 @@ class AgentRunner:
             }
 
             config = db.query(AIConfig).filter(AIConfig.is_active == True).first()
-            llm = LLMFactory.from_db_config(config, tier="quick") if config else None
+            llm = LLMFactory.from_db_config(config) if config else None
             return await publisher_node(state, llm, db)
         finally:
             db.close()

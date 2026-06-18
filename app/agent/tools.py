@@ -1,7 +1,8 @@
 from langchain_core.tools import tool
 from app.services.xhs_client import XHSClient
+from app.config import XHS_MCP_URL
 
-MCP_BASE_URL = "http://localhost:18060"
+MCP_BASE_URL = XHS_MCP_URL  # from XHS_MCP_URL env var, default http://localhost:18060
 
 
 @tool

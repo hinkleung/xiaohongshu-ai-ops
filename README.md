@@ -13,6 +13,12 @@
 
 ---
 
+> ⚠️ **Disclaimer** · This project is built for **personal learning and research purposes only**. It is not intended for commercial use, large-scale automation, or any activity that violates Xiaohongshu's terms of service. Use responsibly and at your own risk.
+>
+> ⚠️ **声明** · 本项目仅供**个人学习和研究使用**，不适用于商业用途、大规模自动化或任何违反小红书服务条款的行为。请合理使用，风险自负。
+
+---
+
 [English](#english) | [中文](#chinese)
 
 ---
